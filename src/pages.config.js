@@ -16,6 +16,7 @@ import Settings from './pages/Settings';
 import SystemStatus from './pages/SystemStatus';
 import ComplianceNotes from './pages/ComplianceNotes';
 import SquareReviewPack from './pages/SquareReviewPack';
+import ButtonWiringChecklist from './pages/ButtonWiringChecklist';
 import __Layout from './Layout.jsx';
 
 
@@ -38,6 +39,7 @@ export const PAGES = {
     "SystemStatus": SystemStatus,
     "ComplianceNotes": ComplianceNotes,
     "SquareReviewPack": SquareReviewPack,
+    "ButtonWiringChecklist": ButtonWiringChecklist,
 }
 
 export const pagesConfig = {
