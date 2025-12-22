@@ -17,27 +17,85 @@ import {
   Link2,
   CheckCircle,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import AllocationRuleBuilder from '@/components/allocation/AllocationRuleBuilder';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('general');
-  const [isSquareConnected, setIsSquareConnected] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
     queryFn: () => base44.entities.Location.list(),
   });
 
-  const [selectedLocation, setSelectedLocation] = useState(null);
+  const { data: squareConnections = [], isLoading: loadingConnection } = useQuery({
+    queryKey: ['squareConnection'],
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      return await base44.entities.SquareConnection.filter({
+        organization_id: user.organization_id || user.id
+      });
+    },
+  });
 
-  const handleSync = async () => {
-    setIsSyncing(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setIsSyncing(false);
-  };
+  const squareConnection = squareConnections.find(c => c.connection_status === 'connected');
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('squareOAuthStart', {});
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      }
+    },
+    onError: (error) => {
+      toast.error('Connection failed: ' + error.message);
+    }
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      if (!squareConnection) throw new Error('No Square connection found');
+      const response = await base44.functions.invoke('squareSync', {
+        connection_id: squareConnection.id,
+        triggered_by: 'manual'
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
+      toast.success('Sync complete!');
+    },
+    onError: (error) => {
+      toast.error('Sync failed: ' + error.message);
+    }
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      if (!squareConnection) throw new Error('No connection');
+      const response = await base44.functions.invoke('squareDisconnect', {
+        connection_id: squareConnection.id,
+        preserve_data: true
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
+      toast.success('Square disconnected successfully');
+    },
+    onError: (error) => {
+      toast.error('Disconnect failed: ' + error.message);
+    }
+  });
+
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
@@ -135,52 +193,86 @@ export default function Settings() {
                 <CardDescription>Sync transactions, employees, and locations from Square</CardDescription>
               </CardHeader>
               <CardContent>
-                {isSquareConnected ? (
+                {loadingConnection ? (
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-16 bg-slate-200 rounded-xl"></div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="h-20 bg-slate-200 rounded-lg"></div>
+                      <div className="h-20 bg-slate-200 rounded-lg"></div>
+                      <div className="h-20 bg-slate-200 rounded-lg"></div>
+                    </div>
+                  </div>
+                ) : squareConnection ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-50 border border-emerald-200">
                       <div className="flex items-center gap-3">
                         <CheckCircle className="w-5 h-5 text-emerald-600" />
                         <div>
                           <p className="font-medium text-emerald-900">Connected to Square</p>
-                          <p className="text-sm text-emerald-700">Merchant: Demo Restaurant Group</p>
+                          <p className="text-sm text-emerald-700">Merchant: {squareConnection.merchant_business_name}</p>
                         </div>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleSync}
-                        disabled={isSyncing}
+                        onClick={() => syncMutation.mutate()}
+                        disabled={syncMutation.isPending}
                         className="border-emerald-300"
                       >
-                        <RefreshCw className={`w-4 h-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                        {isSyncing ? 'Syncing...' : 'Sync Now'}
+                        <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                        {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
                       </Button>
                     </div>
                     
                     <div className="grid md:grid-cols-3 gap-4">
                       <div className="p-4 rounded-lg bg-slate-50">
-                        <p className="text-2xl font-bold text-slate-900">127</p>
-                        <p className="text-sm text-slate-500">Transactions synced today</p>
+                        <p className="text-2xl font-bold text-slate-900">{locations.length}</p>
+                        <p className="text-sm text-slate-500">Locations connected</p>
                       </div>
                       <div className="p-4 rounded-lg bg-slate-50">
-                        <p className="text-2xl font-bold text-slate-900">24</p>
+                        <p className="text-2xl font-bold text-slate-900">-</p>
                         <p className="text-sm text-slate-500">Team members synced</p>
                       </div>
                       <div className="p-4 rounded-lg bg-slate-50">
-                        <p className="text-2xl font-bold text-slate-900">3</p>
-                        <p className="text-sm text-slate-500">Locations connected</p>
+                        <p className="text-2xl font-bold text-slate-900">-</p>
+                        <p className="text-sm text-slate-500">Transactions synced</p>
                       </div>
                     </div>
 
-                    <Button variant="outline" className="text-rose-600 border-rose-200 hover:bg-rose-50">
-                      Disconnect Square
+                    <Button 
+                      variant="outline" 
+                      className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                      onClick={() => disconnectMutation.mutate()}
+                      disabled={disconnectMutation.isPending}
+                    >
+                      {disconnectMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Disconnecting...
+                        </>
+                      ) : (
+                        'Disconnect Square'
+                      )}
                     </Button>
                   </div>
                 ) : (
-                  <Button className="bg-slate-900 hover:bg-slate-800">
-                    <Link2 className="w-4 h-4 mr-2" />
-                    Connect with Square
-                    <ExternalLink className="w-3 h-3 ml-2" />
+                  <Button 
+                    className="bg-slate-900 hover:bg-slate-800"
+                    onClick={() => connectMutation.mutate()}
+                    disabled={connectMutation.isPending}
+                  >
+                    {connectMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="w-4 h-4 mr-2" />
+                        Connect with Square
+                        <ExternalLink className="w-3 h-3 ml-2" />
+                      </>
+                    )}
                   </Button>
                 )}
               </CardContent>
