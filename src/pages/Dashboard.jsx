@@ -121,6 +121,19 @@ export default function Dashboard() {
     }
   });
 
+  const { data: webhookLogs = [] } = useQuery({
+    queryKey: ['recentWebhooks', squareConnection?.id],
+    queryFn: async () => {
+      if (!squareConnection) return [];
+      return await base44.entities.WebhookLog.filter(
+        { square_connection_id: squareConnection.id },
+        '-received_at',
+        10
+      );
+    },
+    enabled: !!squareConnection,
+  });
+
   const connectMutation = useMutation({
     mutationFn: async () => {
       const response = await base44.functions.invoke('squareOAuthStart', {});
@@ -398,7 +411,7 @@ export default function Dashboard() {
 
                 {/* Sync Stats */}
                 {lastSyncJob && (
-                  <div className="grid grid-cols-3 gap-3 pt-3 border-t border-emerald-100">
+                  <div className="grid grid-cols-4 gap-3 pt-3 border-t border-emerald-100">
                     <div className="text-center p-3 rounded-lg bg-white/60">
                       <p className="text-2xl font-bold text-slate-900">{locations.length}</p>
                       <p className="text-xs text-slate-500">Locations</p>
@@ -406,6 +419,10 @@ export default function Dashboard() {
                     <div className="text-center p-3 rounded-lg bg-white/60">
                       <p className="text-2xl font-bold text-slate-900">{employees.length}</p>
                       <p className="text-xs text-slate-500">Team Members</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-white/60">
+                      <p className="text-2xl font-bold text-indigo-600">{webhookLogs.length}</p>
+                      <p className="text-xs text-slate-500">Webhooks 24h</p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-white/60">
                       <p className="text-2xl font-bold text-emerald-600">

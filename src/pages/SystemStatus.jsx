@@ -237,10 +237,10 @@ export default function SystemStatus() {
         <Card className="border-0 shadow-sm mb-6">
           <CardHeader>
             <CardTitle>Webhook Health (Last 24h)</CardTitle>
-            <CardDescription>Recent webhook deliveries from Square</CardDescription>
+            <CardDescription>Real-time updates from Square via webhooks</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <div className="grid md:grid-cols-4 gap-4 mb-4">
               <div className="p-4 rounded-lg bg-slate-50">
                 <p className="text-sm text-slate-500">Total Received</p>
                 <p className="text-2xl font-bold text-slate-900">{last24hWebhooks.length}</p>
@@ -255,6 +255,14 @@ export default function SystemStatus() {
                 <p className="text-sm text-rose-700">Failed</p>
                 <p className="text-2xl font-bold text-rose-900">
                   {last24hWebhooks.filter(w => !w.processed && w.processing_error).length}
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-indigo-50">
+                <p className="text-sm text-indigo-700">Last Received</p>
+                <p className="text-sm font-bold text-indigo-900">
+                  {webhookLogs.length > 0 
+                    ? formatDistanceToNow(new Date(webhookLogs[0].received_at), { addSuffix: true })
+                    : 'Never'}
                 </p>
               </div>
             </div>
@@ -277,6 +285,44 @@ export default function SystemStatus() {
                 </div>
               </div>
             )}
+
+            {/* Recent Webhook Activity */}
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-slate-900 mb-3">Recent Webhook Activity</h4>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Event Type</TableHead>
+                    <TableHead>Received</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Processing Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {webhookLogs.slice(0, 10).map(webhook => (
+                    <TableRow key={webhook.id}>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">{webhook.event_type}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{formatDistanceToNow(new Date(webhook.received_at), { addSuffix: true })}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="outline"
+                          className={webhook.processed ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}
+                        >
+                          {webhook.processed ? 'Processed' : 'Failed'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {webhook.processed_at 
+                          ? `${Math.round((new Date(webhook.processed_at) - new Date(webhook.received_at)) / 1000)}s`
+                          : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
