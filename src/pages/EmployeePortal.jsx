@@ -348,7 +348,6 @@ export default function EmployeePortal() {
         allocationLines={allocationLines}
         batches={batches}
       />
-      </div>
     </div>
   );
 }
