@@ -48,6 +48,28 @@ Deno.serve(async (req) => {
 
     const connection = connections[0];
 
+    // Check if connection is active - don't process webhooks for disconnected accounts
+    if (connection.connection_status === 'revoked' || connection.connection_status === 'expired') {
+      console.log('Webhook ignored - connection is', connection.connection_status);
+      await base44.asServiceRole.entities.WebhookLog.create({
+        organization_id: connection.organization_id,
+        square_connection_id: connection.id,
+        webhook_event_id: eventId,
+        event_type: payload.type,
+        merchant_id: payload.merchant_id,
+        payload: payload,
+        received_at: new Date().toISOString(),
+        signature_valid: false,
+        processed: false,
+        processing_error: `Connection ${connection.connection_status} - not processing webhooks`
+      });
+      return Response.json({ 
+        received: true, 
+        processed: false,
+        reason: `Connection ${connection.connection_status}` 
+      }, { status: 200 });
+    }
+
     // Verify signature
     const isValid = verifySquareSignature(body, signature, connection.webhook_signature_key);
     

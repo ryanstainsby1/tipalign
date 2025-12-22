@@ -517,15 +517,32 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle>Disconnect Square Account?</DialogTitle>
             <DialogDescription>
-              This will revoke TipFlow's access to your Square account and stop syncing new data.
+              This will permanently revoke TipFlow's access to your Square account.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-3">
             <Alert className="border-amber-200 bg-amber-50">
               <AlertCircle className="w-4 h-4 text-amber-600" />
               <AlertDescription className="text-amber-900">
-                <strong>Historical data will be preserved.</strong> All existing tip allocations, 
-                exports, and audit logs will remain accessible for compliance purposes.
+                <strong>What will happen:</strong>
+                <ul className="mt-2 space-y-1 text-sm">
+                  <li>• Square access tokens will be revoked</li>
+                  <li>• Automatic syncing will stop</li>
+                  <li>• Webhooks will no longer be processed</li>
+                  <li>• You won't receive new transactions from Square</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+            <Alert className="border-emerald-200 bg-emerald-50">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <AlertDescription className="text-emerald-900">
+                <strong>Historical data is safe:</strong>
+                <ul className="mt-2 space-y-1 text-sm">
+                  <li>• All existing payments and transactions preserved</li>
+                  <li>• Employee records and tip allocations remain intact</li>
+                  <li>• Payroll exports and compliance reports still accessible</li>
+                  <li>• Full audit trail maintained for HMRC (6+ years)</li>
+                </ul>
               </AlertDescription>
             </Alert>
           </div>
@@ -541,7 +558,7 @@ export default function Dashboard() {
               disabled={disconnectMutation.isPending}
               className="bg-rose-600 hover:bg-rose-700"
             >
-              {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect Square'}
+              {disconnectMutation.isPending ? 'Disconnecting...' : 'Yes, Disconnect Square'}
             </Button>
           </DialogFooter>
         </DialogContent>
