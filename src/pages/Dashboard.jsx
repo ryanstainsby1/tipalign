@@ -28,8 +28,26 @@ export default function Dashboard() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('square_connected') === '1') {
       const merchantName = urlParams.get('merchant');
-      toast.success(`Connected to Square${merchantName ? `: ${merchantName}` : ''}!`);
+      const syncStatus = urlParams.get('sync_status');
+      const locationsSynced = urlParams.get('locations_synced') || 0;
+      const staffSynced = urlParams.get('staff_synced') || 0;
+      
       queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      
+      if (syncStatus === 'success') {
+        toast.success(
+          `Connected to Square: ${merchantName}! Synced ${locationsSynced} locations and ${staffSynced} team members.`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success(`Connected to Square: ${merchantName}!`, { duration: 4000 });
+        if (syncStatus === 'partial') {
+          toast.warning('Initial sync completed with some warnings. Check System Status for details.', { duration: 4000 });
+        }
+      }
+      
       window.history.replaceState({}, '', '/Dashboard');
     } else if (urlParams.get('square_error')) {
       const error = urlParams.get('square_error');
@@ -69,6 +87,20 @@ export default function Dashboard() {
   });
 
   const squareConnection = squareConnections.find(c => c.connection_status === 'connected');
+
+  const { data: lastSyncJob } = useQuery({
+    queryKey: ['lastSyncJob', squareConnection?.id],
+    queryFn: async () => {
+      if (!squareConnection) return null;
+      const jobs = await base44.entities.SyncJob.filter(
+        { square_connection_id: squareConnection.id },
+        '-started_at',
+        1
+      );
+      return jobs[0] || null;
+    },
+    enabled: !!squareConnection,
+  });
 
   const connectMutation = useMutation({
     mutationFn: async () => {
@@ -270,46 +302,80 @@ export default function Dashboard() {
         ) : (
           <Card className="mb-8 border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-white">
             <CardContent className="p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-emerald-100">
-                    <CheckCircle className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-slate-900">Connected to Square</h3>
-                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Active</Badge>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-emerald-100">
+                      <CheckCircle className="w-6 h-6 text-emerald-600" />
                     </div>
-                    <p className="text-sm text-slate-600 mt-1">
-                      {squareConnection.merchant_business_name} • Merchant ID: {squareConnection.square_merchant_id}
-                    </p>
-                    {squareConnection.last_sync_at && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        Last synced: {format(new Date(squareConnection.last_sync_at), 'PPp')}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-slate-900">Connected to Square</h3>
+                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Active</Badge>
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {squareConnection.merchant_business_name}
                       </p>
-                    )}
+                      {lastSyncJob && (
+                        <div className="flex items-center gap-3 mt-2 text-xs">
+                          <span className="text-slate-500">
+                            Last sync: {format(new Date(lastSyncJob.completed_at || lastSyncJob.started_at), 'PPp')}
+                          </span>
+                          {lastSyncJob.status === 'completed' && (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 text-xs">
+                              {lastSyncJob.records_created + lastSyncJob.records_updated} records
+                            </Badge>
+                          )}
+                          {lastSyncJob.status === 'partial' && (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 text-xs">
+                              {lastSyncJob.errors?.length || 0} warnings
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => syncMutation.mutate()}
+                      disabled={syncMutation.isPending}
+                      className="border-emerald-300"
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                      {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDisconnectDialog(true)}
+                      className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                    >
+                      Disconnect
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncMutation.mutate()}
-                    disabled={syncMutation.isPending}
-                    className="border-emerald-300"
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                    {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowDisconnectDialog(true)}
-                    className="text-rose-600 border-rose-200 hover:bg-rose-50"
-                  >
-                    Disconnect
-                  </Button>
-                </div>
+
+                {/* Sync Stats */}
+                {lastSyncJob && (
+                  <div className="grid grid-cols-3 gap-3 pt-3 border-t border-emerald-100">
+                    <div className="text-center p-3 rounded-lg bg-white/60">
+                      <p className="text-2xl font-bold text-slate-900">{locations.length}</p>
+                      <p className="text-xs text-slate-500">Locations</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-white/60">
+                      <p className="text-2xl font-bold text-slate-900">{employees.length}</p>
+                      <p className="text-xs text-slate-500">Team Members</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-white/60">
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {lastSyncJob.status === 'completed' ? '✓' : lastSyncJob.status === 'partial' ? '⚠' : '✗'}
+                      </p>
+                      <p className="text-xs text-slate-500 capitalize">{lastSyncJob.status}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

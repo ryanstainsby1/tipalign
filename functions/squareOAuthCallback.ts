@@ -150,20 +150,61 @@ Deno.serve(async (req) => {
       severity: 'info'
     });
 
-    // Trigger initial sync in background
+    // Trigger bootstrap sync
+    let syncSuccess = false;
+    let syncResults = null;
+    let locationsCount = 0;
+    let staffCount = 0;
+    
     try {
-      await base44.asServiceRole.functions.invoke('squareSyncEngine', {
+      const syncResponse = await base44.asServiceRole.functions.invoke('squareSync', {
         connection_id: connection.id,
-        entity_types: ['locations', 'team_members'],
         triggered_by: 'initial_setup'
       });
+      syncResults = syncResponse.data;
+      syncSuccess = syncResults.success;
+      locationsCount = syncResults.records_created || 0;
+      staffCount = syncResults.records_updated || 0;
+      
+      // Count actual entities synced
+      const locations = await base44.asServiceRole.entities.Location.filter({
+        organization_id: stateData.org_id
+      });
+      const employees = await base44.asServiceRole.entities.Employee.filter({
+        organization_id: stateData.org_id
+      });
+      
+      locationsCount = locations.length;
+      staffCount = employees.length;
+      
     } catch (syncError) {
-      console.error('Initial sync failed:', syncError);
-      // Don't fail the connection if sync fails
+      console.error('Bootstrap sync failed:', syncError);
+      // Log error but don't fail the connection
+      await base44.asServiceRole.entities.AppError.create({
+        organization_id: stateData.org_id,
+        user_id: stateData.user_id,
+        page: 'OAuth Callback',
+        action_name: 'bootstrap_sync',
+        error_message: syncError.message,
+        error_stack: syncError.stack,
+        severity: 'warning',
+        metadata: {
+          connection_id: connection.id,
+          merchant_id: merchantId
+        }
+      });
     }
 
-    // Redirect back to dashboard
-    const redirectUrl = `${url.origin}/Dashboard?square_connected=1&merchant=${encodeURIComponent(merchantName)}`;
+    // Redirect back to dashboard with sync status
+    const params = new URLSearchParams({
+      square_connected: '1',
+      merchant: merchantName,
+      sync_status: syncSuccess ? 'success' : 'partial',
+      locations_synced: locationsCount.toString(),
+      staff_synced: staffCount.toString()
+    });
+    
+    const redirectUrl = `${url.origin}/Dashboard?${params.toString()}`;
     return Response.redirect(redirectUrl, 302);
 
   } catch (error) {

@@ -39,14 +39,16 @@ Deno.serve(async (req) => {
     };
 
     // Create sync job
+    const { triggered_by = 'manual' } = await req.json();
+    
     const syncJob = await base44.asServiceRole.entities.SyncJob.create({
       organization_id: connection.organization_id,
       square_connection_id: connection.id,
-      sync_type: connection_id ? 'incremental' : 'full',
+      sync_type: triggered_by === 'initial_setup' ? 'full' : 'incremental',
       entities_synced: ['locations', 'team_members'],
       started_at: new Date().toISOString(),
       status: 'running',
-      triggered_by: 'manual'
+      triggered_by: triggered_by
     });
 
     let recordsCreated = 0;
@@ -177,7 +179,8 @@ Deno.serve(async (req) => {
         sync_job_id: syncJob.id,
         records_created: recordsCreated,
         records_updated: recordsUpdated,
-        errors_count: errors.length
+        errors_count: errors.length,
+        warnings: errors.length > 0 ? errors.map(e => e.error_message) : []
       });
 
     } catch (error) {
