@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MapPin, Save, Users, Terminal } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowLeft, MapPin, Save, Users, Terminal, Settings } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import AllocationRuleBuilder from '@/components/allocation/AllocationRuleBuilder';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function LocationSettings() {
   const urlParams = new URLSearchParams(window.location.search);
   const locationId = urlParams.get('id');
+  const navigate = useNavigate();
 
   const queryClient = useQueryClient();
 
@@ -228,13 +229,28 @@ export default function LocationSettings() {
             </CardContent>
           </Card>
 
-          {/* Allocation Rules */}
-          <AllocationRuleBuilder
-            initialPolicy={location.tip_policy || 'individual'}
-            initialWeights={location.role_weights || {}}
-            onSave={handleSaveRules}
-            isSaving={updateMutation.isPending}
-          />
+          {/* Allocation Rules - Link to Builder */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle>Tip Allocation Rules</CardTitle>
+              <CardDescription>Configure how tips are distributed at this location</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50">
+                <div>
+                  <p className="font-medium text-slate-900">Rules Builder</p>
+                  <p className="text-sm text-slate-500">Design allocation policies with versioning and preview</p>
+                </div>
+                <Button
+                  onClick={() => navigate(createPageUrl('RulesBuilder') + `?location=${locationId}`)}
+                  variant="outline"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Configure Rules
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
