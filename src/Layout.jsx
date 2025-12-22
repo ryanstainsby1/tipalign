@@ -1,0 +1,176 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { 
+  LayoutDashboard, 
+  MapPin, 
+  Users, 
+  PieChart, 
+  Shield, 
+  Settings,
+  Menu,
+  X,
+  LogOut,
+  ChevronRight,
+  User
+} from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { base44 } from '@/api/base44Client';
+
+const navigation = [
+  { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
+  { name: 'Locations', page: 'Locations', icon: MapPin },
+  { name: 'Employees', page: 'Employees', icon: Users },
+  { name: 'Allocations', page: 'Allocations', icon: PieChart },
+  { name: 'Compliance', page: 'Compliance', icon: Shield },
+  { name: 'Settings', page: 'Settings', icon: Settings },
+];
+
+export default function Layout({ children, currentPageName }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleLogout = () => {
+    base44.auth.logout();
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-slate-200 
+        transform transition-transform duration-200 ease-in-out
+        lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="flex flex-col h-full">
+          {/* Logo */}
+          <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100">
+            <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">T</span>
+              </div>
+              <span className="font-semibold text-slate-900 text-lg">TipFlow</span>
+            </Link>
+            <button 
+              className="lg:hidden p-1 text-slate-400 hover:text-slate-600"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            {navigation.map((item) => {
+              const isActive = currentPageName === item.page;
+              return (
+                <Link
+                  key={item.name}
+                  to={createPageUrl(item.page)}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`
+                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                    transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-50 text-indigo-700' 
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }
+                  `}
+                >
+                  <item.icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  {item.name}
+                  {isActive && <ChevronRight className="w-4 h-4 ml-auto text-indigo-400" />}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Employee Portal Link */}
+          <div className="px-3 py-2">
+            <Link
+              to={createPageUrl('EmployeePortal')}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-dashed border-slate-200"
+            >
+              <User className="w-5 h-5 text-slate-400" />
+              Employee Portal
+            </Link>
+          </div>
+
+          {/* User menu */}
+          <div className="p-4 border-t border-slate-100">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                  <Avatar className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500">
+                    <AvatarFallback className="bg-transparent text-white text-sm font-medium">
+                      AD
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-slate-900">Admin User</p>
+                    <p className="text-xs text-slate-500">admin@demo.com</p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild>
+                  <Link to={createPageUrl('Settings')}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-rose-600">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="lg:pl-64">
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-sm border-b border-slate-200 lg:hidden">
+          <div className="flex items-center justify-between h-16 px-4">
+            <button 
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 text-slate-600 hover:text-slate-900"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">T</span>
+              </div>
+              <span className="font-semibold text-slate-900">TipFlow</span>
+            </Link>
+            <div className="w-10" /> {/* Spacer for centering */}
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main>
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
