@@ -53,7 +53,8 @@ Deno.serve(async (req) => {
       client_id: SQUARE_APP_ID,
       scope: 'PAYMENTS_READ MERCHANT_PROFILE_READ EMPLOYEES_READ TIMECARDS_READ',
       session: 'false',
-      state: state
+      state: state,
+      redirect_uri: callbackUrl
     });
 
     const redirectUrl = `${authUrl}?${params.toString()}`;
