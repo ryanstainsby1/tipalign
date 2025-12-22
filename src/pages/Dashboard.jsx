@@ -114,9 +114,9 @@ export default function Dashboard() {
       );
     },
     enabled: !!squareConnection,
-    refetchInterval: (data) => {
+    refetchInterval: () => {
       // Refetch every 3 seconds if there's a running job
-      const hasRunningJob = data?.some(job => job.status === 'running');
+      const hasRunningJob = recentSyncJobs.some(job => job.status === 'running');
       return hasRunningJob ? 3000 : false;
     }
   });
