@@ -43,7 +43,7 @@ export default function EmployeeTipHistory({ allocationLines = [], adjustments =
     <Card className="border-0 shadow-sm bg-white">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold text-slate-900">
-          Tip History for {employeeName}
+          My Tip History
         </CardTitle>
       </CardHeader>
       <CardContent>
