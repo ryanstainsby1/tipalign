@@ -316,6 +316,15 @@ Deno.serve(async (req) => {
     }
 
     const connection = connections[0];
+
+    // Don't sync if connection is revoked/expired
+    if (connection.connection_status === 'revoked' || connection.connection_status === 'expired') {
+      return Response.json({ 
+        error: `Connection is ${connection.connection_status}. Please reconnect Square to sync.`,
+        status: connection.connection_status
+      }, { status: 403 });
+    }
+
     const orgId = connection.organization_id;
 
     const syncJob = await base44.asServiceRole.entities.SyncJob.create({
