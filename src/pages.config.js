@@ -1,6 +1,8 @@
 import AllocationDetail from './pages/AllocationDetail';
 import Allocations from './pages/Allocations';
+import ButtonWiringChecklist from './pages/ButtonWiringChecklist';
 import Compliance from './pages/Compliance';
+import ComplianceNotes from './pages/ComplianceNotes';
 import ConnectSquare from './pages/ConnectSquare';
 import Dashboard from './pages/Dashboard';
 import Disputes from './pages/Disputes';
@@ -13,17 +15,17 @@ import Locations from './pages/Locations';
 import Reconciliation from './pages/Reconciliation';
 import RulesBuilder from './pages/RulesBuilder';
 import Settings from './pages/Settings';
-import SystemStatus from './pages/SystemStatus';
-import ComplianceNotes from './pages/ComplianceNotes';
 import SquareReviewPack from './pages/SquareReviewPack';
-import ButtonWiringChecklist from './pages/ButtonWiringChecklist';
+import SystemStatus from './pages/SystemStatus';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AllocationDetail": AllocationDetail,
     "Allocations": Allocations,
+    "ButtonWiringChecklist": ButtonWiringChecklist,
     "Compliance": Compliance,
+    "ComplianceNotes": ComplianceNotes,
     "ConnectSquare": ConnectSquare,
     "Dashboard": Dashboard,
     "Disputes": Disputes,
@@ -36,10 +38,8 @@ export const PAGES = {
     "Reconciliation": Reconciliation,
     "RulesBuilder": RulesBuilder,
     "Settings": Settings,
-    "SystemStatus": SystemStatus,
-    "ComplianceNotes": ComplianceNotes,
     "SquareReviewPack": SquareReviewPack,
-    "ButtonWiringChecklist": ButtonWiringChecklist,
+    "SystemStatus": SystemStatus,
 }
 
 export const pagesConfig = {

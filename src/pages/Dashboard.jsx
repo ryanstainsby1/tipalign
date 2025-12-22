@@ -17,6 +17,7 @@ import AllocationBreakdown from '@/components/dashboard/AllocationBreakdown';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import ComplianceStatus from '@/components/dashboard/ComplianceStatus';
 import PayrollExportModal from '@/components/exports/PayrollExportModal';
+import SyncHistory from '@/components/dashboard/SyncHistory';
 
 export default function Dashboard() {
   const [showExportModal, setShowExportModal] = useState(false);
@@ -102,6 +103,24 @@ export default function Dashboard() {
     enabled: !!squareConnection,
   });
 
+  const { data: recentSyncJobs = [] } = useQuery({
+    queryKey: ['recentSyncJobs', squareConnection?.id],
+    queryFn: async () => {
+      if (!squareConnection) return [];
+      return await base44.entities.SyncJob.filter(
+        { square_connection_id: squareConnection.id },
+        '-started_at',
+        5
+      );
+    },
+    enabled: !!squareConnection,
+    refetchInterval: (data) => {
+      // Refetch every 3 seconds if there's a running job
+      const hasRunningJob = data?.some(job => job.status === 'running');
+      return hasRunningJob ? 3000 : false;
+    }
+  });
+
   const connectMutation = useMutation({
     mutationFn: async () => {
       const response = await base44.functions.invoke('squareOAuthStart', {});
@@ -124,20 +143,40 @@ export default function Dashboard() {
         throw new Error('No Square connection found');
       }
       const response = await base44.functions.invoke('squareSync', {
-        connection_id: squareConnection.id
+        connection_id: squareConnection.id,
+        triggered_by: 'manual'
       });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['locations'] });
       queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
-      toast.success('Data synced successfully');
+      queryClient.invalidateQueries({ queryKey: ['lastSyncJob'] });
+      queryClient.invalidateQueries({ queryKey: ['recentSyncJobs'] });
+      
+      const summary = [];
+      if (data.entity_counts) {
+        const { locations, team_members, shifts, payments } = data.entity_counts;
+        if (locations.created + locations.updated > 0) summary.push(`${locations.created + locations.updated} locations`);
+        if (team_members.created + team_members.updated > 0) summary.push(`${team_members.created + team_members.updated} staff`);
+        if (shifts.created + shifts.updated > 0) summary.push(`${shifts.created + shifts.updated} shifts`);
+        if (payments.created + payments.updated > 0) summary.push(`${payments.created + payments.updated} payments`);
+      }
+      
+      toast.success(
+        `Sync complete! ${summary.length > 0 ? summary.join(', ') : 'All data up to date'}`,
+        { duration: 5000 }
+      );
     },
     onError: (error) => {
       logError({ page: 'Dashboard', action: 'syncData', error });
-      toast.error('Sync failed: ' + error.message);
+      if (error.message.includes('already in progress')) {
+        toast.error('A sync is already running. Please wait for it to finish.');
+      } else {
+        toast.error('Sync failed: ' + error.message);
+      }
     }
   });
 
@@ -431,12 +470,17 @@ export default function Dashboard() {
           <div className="lg:col-span-2">
             <RecentTransactions transactions={transactions} />
           </div>
-          <ComplianceStatus
-            hmrcReady={true}
-            lastExport="15 Jan 2025"
-            pendingAllocations={pendingAllocations}
-            auditScore={98}
-          />
+          <div className="space-y-6">
+            {squareConnection && recentSyncJobs.length > 0 && (
+              <SyncHistory syncJobs={recentSyncJobs} />
+            )}
+            <ComplianceStatus
+              hmrcReady={true}
+              lastExport="15 Jan 2025"
+              pendingAllocations={pendingAllocations}
+              auditScore={98}
+            />
+          </div>
         </div>
       </div>
 
