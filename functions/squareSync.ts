@@ -23,6 +23,14 @@ Deno.serve(async (req) => {
 
     const connection = connections[0];
 
+    // Don't allow sync if connection is revoked/expired
+    if (connection.connection_status === 'revoked' || connection.connection_status === 'expired') {
+      return Response.json({ 
+        error: `Square connection is ${connection.connection_status}. Please reconnect to sync data.`,
+        status: connection.connection_status
+      }, { status: 403 });
+    }
+
     if (connection.connection_status !== 'connected') {
       return Response.json({ error: 'Connection not active' }, { status: 400 });
     }
