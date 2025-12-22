@@ -8,6 +8,7 @@ import LocationSettings from './pages/LocationSettings';
 import EmployeePortal from './pages/EmployeePortal';
 import ConnectSquare from './pages/ConnectSquare';
 import Reconciliation from './pages/Reconciliation';
+import RulesBuilder from './pages/RulesBuilder';
 import __Layout from './Layout.jsx';
 
 
@@ -22,6 +23,7 @@ export const PAGES = {
     "EmployeePortal": EmployeePortal,
     "ConnectSquare": ConnectSquare,
     "Reconciliation": Reconciliation,
+    "RulesBuilder": RulesBuilder,
 }
 
 export const pagesConfig = {
