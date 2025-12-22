@@ -15,6 +15,7 @@ import RulesBuilder from './pages/RulesBuilder';
 import Settings from './pages/Settings';
 import SystemStatus from './pages/SystemStatus';
 import ComplianceNotes from './pages/ComplianceNotes';
+import SquareReviewPack from './pages/SquareReviewPack';
 import __Layout from './Layout.jsx';
 
 
@@ -36,6 +37,7 @@ export const PAGES = {
     "Settings": Settings,
     "SystemStatus": SystemStatus,
     "ComplianceNotes": ComplianceNotes,
+    "SquareReviewPack": SquareReviewPack,
 }
 
 export const pagesConfig = {

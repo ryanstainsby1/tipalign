@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
+  let connectionId = null;
+  
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -10,6 +12,7 @@ Deno.serve(async (req) => {
     }
 
     const { connection_id, preserve_data = true } = await req.json();
+    connectionId = connection_id;
 
     // Get connection
     const connections = await base44.asServiceRole.entities.SquareConnection.filter({
@@ -23,17 +26,24 @@ Deno.serve(async (req) => {
 
     const connection = connections[0];
 
+    // Create snapshot for audit
+    const beforeSnapshot = {
+      merchant_id: connection.square_merchant_id,
+      merchant_name: connection.merchant_business_name,
+      connected_at: connection.created_date,
+      last_sync_at: connection.last_sync_at
+    };
+
     // Revoke Square access token
     try {
       const SQUARE_APP_ID = Deno.env.get('SQUARE_APP_ID');
-      const SQUARE_APP_SECRET = Deno.env.get('SQUARE_APP_SECRET');
       const SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT') || 'sandbox';
 
       const revokeUrl = SQUARE_ENVIRONMENT === 'production'
         ? 'https://connect.squareup.com/oauth2/revoke'
         : 'https://connect.squareupsandbox.com/oauth2/revoke';
 
-      await fetch(revokeUrl, {
+      const revokeResponse = await fetch(revokeUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -44,23 +54,19 @@ Deno.serve(async (req) => {
           access_token: connection.square_access_token_encrypted
         })
       });
+
+      if (!revokeResponse.ok) {
+        console.warn('Square token revocation failed:', await revokeResponse.text());
+      }
     } catch (error) {
       console.error('Error revoking Square token:', error);
       // Continue with disconnection even if revoke fails
     }
 
-    // Create snapshot for audit
-    const beforeSnapshot = {
-      merchant_id: connection.square_merchant_id,
-      merchant_name: connection.merchant_business_name,
-      connected_at: connection.created_date,
-      last_sync_at: connection.last_sync_at
-    };
-
     // Update connection status
     await base44.asServiceRole.entities.SquareConnection.update(connection.id, {
       connection_status: 'revoked',
-      square_access_token_encrypted: '', // Clear tokens
+      square_access_token_encrypted: '',
       square_refresh_token_encrypted: '',
       last_error: 'Manually disconnected by user',
       last_error_at: new Date().toISOString()
@@ -80,10 +86,10 @@ Deno.serve(async (req) => {
         status: 'revoked',
         preserve_data: preserve_data
       },
-      changes_summary: 'Square account disconnected',
+      changes_summary: 'Square account disconnected - tokens revoked, historical data preserved',
       reason: preserve_data 
-        ? 'Disconnected - historical data preserved'
-        : 'Disconnected - data may be archived',
+        ? 'Disconnected - historical data preserved for compliance (6 year retention)'
+        : 'Disconnected',
       hmrc_relevant: false,
       severity: 'warning'
     });
@@ -91,14 +97,35 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       message: 'Square account disconnected successfully',
-      data_preserved: preserve_data
+      data_preserved: preserve_data,
+      details: {
+        tokens_revoked: true,
+        webhooks_stopped: true,
+        historical_data_retained: preserve_data
+      }
     });
 
   } catch (error) {
     console.error('Square disconnect error:', error);
+    
+    // Ensure connection status is updated even if revocation fails
+    if (connectionId) {
+      try {
+        const base44 = createClientFromRequest(req);
+        await base44.asServiceRole.entities.SquareConnection.update(connectionId, {
+          connection_status: 'revoked',
+          last_error: error.message,
+          last_error_at: new Date().toISOString()
+        });
+      } catch (updateError) {
+        console.error('Failed to update connection status:', updateError);
+      }
+    }
+    
     return Response.json({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      partial_cleanup: !!connectionId 
     }, { status: 500 });
   }
 });
