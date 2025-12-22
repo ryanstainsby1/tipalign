@@ -27,7 +27,9 @@ Deno.serve(async (req) => {
     };
     
     const stateString = JSON.stringify(stateData);
-    const state = Buffer.from(stateString).toString('base64url');
+    const encoder = new TextEncoder();
+    const data = encoder.encode(stateString);
+    const state = btoa(String.fromCharCode(...data)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     // Store state temporarily for validation (expires in 10 minutes)
     await base44.asServiceRole.entities.SystemAuditEvent.create({
