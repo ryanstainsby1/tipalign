@@ -38,6 +38,18 @@ export default function Dashboard() {
     queryFn: () => base44.entities.TipAllocation.list('-allocation_date', 500),
   });
 
+  const { data: squareConnections = [], isLoading: loadingConnection } = useQuery({
+    queryKey: ['squareConnection'],
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      return await base44.entities.SquareConnection.filter({
+        organization_id: user.organization_id || user.id
+      });
+    },
+  });
+
+  const squareConnection = squareConnections.find(c => c.connection_status === 'connected');
+
   // Calculate metrics
   const totalTips = transactions.reduce((sum, tx) => sum + (tx.tip_amount || 0), 0);
   const pendingAllocations = allocations.filter(a => a.status === 'pending').length;

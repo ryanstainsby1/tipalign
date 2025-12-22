@@ -138,10 +138,16 @@ export default function Layout({ children, currentPageName }) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem asChild>
                   <Link to={createPageUrl('Settings')}>
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={createPageUrl('ButtonWiringChecklist')}>
+                      <Activity className="w-4 h-4 mr-2" />
+                      Button Checklist
+                    </Link>
+                  </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-rose-600">
                   <LogOut className="w-4 h-4 mr-2" />
