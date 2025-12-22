@@ -152,6 +152,12 @@ export default function Layout({ children, currentPageName }) {
                     Button Checklist
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to={createPageUrl('SmokeTest')}>
+                    <Activity className="w-4 h-4 mr-2" />
+                    Smoke Tests
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-rose-600">
                   <LogOut className="w-4 h-4 mr-2" />
