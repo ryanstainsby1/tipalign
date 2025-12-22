@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { Toaster } from 'sonner';
 import { 
   LayoutDashboard, 
   MapPin, 
@@ -45,6 +46,8 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Toaster position="top-right" richColors />
+      
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
@@ -139,16 +142,16 @@ export default function Layout({ children, currentPageName }) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem asChild>
                   <Link to={createPageUrl('Settings')}>
-                      <Settings className="w-4 h-4 mr-2" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to={createPageUrl('ButtonWiringChecklist')}>
-                      <Activity className="w-4 h-4 mr-2" />
-                      Button Checklist
-                    </Link>
-                  </DropdownMenuItem>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to={createPageUrl('ButtonWiringChecklist')}>
+                    <Activity className="w-4 h-4 mr-2" />
+                    Button Checklist
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-rose-600">
                   <LogOut className="w-4 h-4 mr-2" />

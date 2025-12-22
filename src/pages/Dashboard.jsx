@@ -1,34 +1,54 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
-import { PoundSterling, Users, MapPin, FileCheck, Download, RefreshCw } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PoundSterling, Users, MapPin, FileCheck, Download, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { format, subDays, startOfMonth } from 'date-fns';
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { format, subDays } from 'date-fns';
+import { toast } from 'sonner';
+import { logError } from '@/components/common/ErrorLogger';
 
 import MetricCard from '@/components/dashboard/MetricCard';
 import TipTrendChart from '@/components/dashboard/TipTrendChart';
 import AllocationBreakdown from '@/components/dashboard/AllocationBreakdown';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import ComplianceStatus from '@/components/dashboard/ComplianceStatus';
-import SquareConnectButton from '@/components/common/SquareConnectButton';
 import PayrollExportModal from '@/components/exports/PayrollExportModal';
 
 export default function Dashboard() {
-  const [isSquareConnected, setIsSquareConnected] = useState(true); // Demo mode
   const [showExportModal, setShowExportModal] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const queryClient = useQueryClient();
 
-  const { data: transactions = [], isLoading: loadingTx } = useQuery({
+  // Check URL params for Square connection status
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('square_connected') === '1') {
+      const merchantName = urlParams.get('merchant');
+      toast.success(`Connected to Square${merchantName ? `: ${merchantName}` : ''}!`);
+      queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
+      window.history.replaceState({}, '', '/Dashboard');
+    } else if (urlParams.get('square_error')) {
+      const error = urlParams.get('square_error');
+      toast.error(`Square connection failed: ${error.replace(/_/g, ' ')}`);
+      window.history.replaceState({}, '', '/Dashboard');
+    }
+  }, [queryClient]);
+
+  const { data: transactions = [] } = useQuery({
     queryKey: ['transactions'],
     queryFn: () => base44.entities.Transaction.list('-transaction_date', 100),
   });
 
-  const { data: employees = [], isLoading: loadingEmp } = useQuery({
+  const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
     queryFn: () => base44.entities.Employee.filter({ employment_status: 'active' }),
   });
 
-  const { data: locations = [], isLoading: loadingLoc } = useQuery({
+  const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
     queryFn: () => base44.entities.Location.filter({ active: true }),
   });
@@ -50,11 +70,85 @@ export default function Dashboard() {
 
   const squareConnection = squareConnections.find(c => c.connection_status === 'connected');
 
-  // Calculate metrics
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('squareOAuthStart', {});
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      }
+    },
+    onError: (error) => {
+      logError({ page: 'Dashboard', action: 'connectSquare', error });
+      toast.error('Connection failed: ' + error.message);
+    }
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      if (!squareConnection) {
+        throw new Error('No Square connection found');
+      }
+      const response = await base44.functions.invoke('squareSync', {
+        connection_id: squareConnection.id
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
+      toast.success('Data synced successfully');
+    },
+    onError: (error) => {
+      logError({ page: 'Dashboard', action: 'syncData', error });
+      toast.error('Sync failed: ' + error.message);
+    }
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      if (!squareConnection) throw new Error('No connection');
+      const response = await base44.functions.invoke('squareDisconnect', {
+        connection_id: squareConnection.id,
+        preserve_data: true
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
+      setShowDisconnectDialog(false);
+      toast.success('Square disconnected successfully');
+    },
+    onError: (error) => {
+      logError({ page: 'Dashboard', action: 'disconnectSquare', error });
+      toast.error('Disconnect failed: ' + error.message);
+    }
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: async (data) => {
+      const response = await base44.functions.invoke('generatePayrollExport', data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Payroll export generated successfully');
+      if (data.file_url) {
+        window.open(data.file_url, '_blank');
+      }
+    },
+    onError: (error) => {
+      logError({ page: 'Dashboard', action: 'exportPayroll', error });
+      toast.error('Export failed: ' + error.message);
+    }
+  });
+
   const totalTips = transactions.reduce((sum, tx) => sum + (tx.tip_amount || 0), 0);
   const pendingAllocations = allocations.filter(a => a.status === 'pending').length;
   
-  // Trend data for chart
   const last14Days = Array.from({ length: 14 }, (_, i) => {
     const date = subDays(new Date(), 13 - i);
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -64,7 +158,6 @@ export default function Dashboard() {
     return { date: format(date, 'dd MMM'), amount: dayTips };
   });
 
-  // Allocation breakdown by role
   const roleBreakdown = allocations.reduce((acc, alloc) => {
     const employee = employees.find(e => e.id === alloc.employee_id);
     const role = employee?.role || 'other';
@@ -78,13 +171,6 @@ export default function Dashboard() {
     return `£${(value / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
   };
 
-  const handleSync = async () => {
-    setIsSyncing(true);
-    // Simulate sync - in production this would call Square API
-    await new Promise(r => setTimeout(r, 2000));
-    setIsSyncing(false);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -95,15 +181,17 @@ export default function Dashboard() {
             <p className="text-slate-500 mt-1">Your tip management overview</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="border-slate-200"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Syncing...' : 'Sync Data'}
-            </Button>
+            {squareConnection && (
+              <Button
+                variant="outline"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                className="border-slate-200"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                {syncMutation.isPending ? 'Syncing...' : 'Sync Data'}
+              </Button>
+            )}
             <Button 
               onClick={() => setShowExportModal(true)}
               className="bg-indigo-600 hover:bg-indigo-700"
@@ -115,16 +203,117 @@ export default function Dashboard() {
         </div>
 
         {/* Square Connection */}
-        <div className="mb-8">
-          <SquareConnectButton
-            isConnected={isSquareConnected}
-            merchantName="Demo Restaurant Group"
-            lastSync="2 minutes ago"
-            onConnect={() => setIsSquareConnected(true)}
-            onSync={handleSync}
-            isSyncing={isSyncing}
-          />
-        </div>
+        {loadingConnection ? (
+          <div className="mb-8 bg-white rounded-xl p-6 shadow-sm">
+            <div className="animate-pulse flex items-center gap-4">
+              <div className="w-12 h-12 bg-slate-200 rounded-xl"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-slate-200 rounded w-48 mb-2"></div>
+                <div className="h-3 bg-slate-200 rounded w-32"></div>
+              </div>
+            </div>
+          </div>
+        ) : !squareConnection ? (
+          <Card className="mb-8 border-0 shadow-lg bg-gradient-to-br from-slate-900 to-slate-700 text-white overflow-hidden">
+            <CardContent className="p-8">
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-3 rounded-xl bg-white/10">
+                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="4" y="4" width="16" height="16" rx="2"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Connect with Square</h3>
+                      <p className="text-sm text-slate-300 mt-1">Sync transactions, employees, and locations automatically</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => connectMutation.mutate()}
+                    disabled={connectMutation.isPending}
+                    className="bg-white text-slate-900 hover:bg-slate-100"
+                    size="lg"
+                  >
+                    {connectMutation.isPending ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        </svg>
+                        Connect Square Account
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="hidden md:flex gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">Auto</div>
+                    <div className="text-xs text-slate-300">Sync</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">100%</div>
+                    <div className="text-xs text-slate-300">Secure</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">UK</div>
+                    <div className="text-xs text-slate-300">Compliant</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="mb-8 border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-white">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-emerald-100">
+                    <CheckCircle className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-slate-900">Connected to Square</h3>
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Active</Badge>
+                    </div>
+                    <p className="text-sm text-slate-600 mt-1">
+                      {squareConnection.merchant_business_name} • Merchant ID: {squareConnection.square_merchant_id}
+                    </p>
+                    {squareConnection.last_sync_at && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        Last synced: {format(new Date(squareConnection.last_sync_at), 'PPp')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending}
+                    className="border-emerald-300"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                    {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDisconnectDialog(true)}
+                    className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                  >
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -190,10 +379,46 @@ export default function Dashboard() {
         onClose={() => setShowExportModal(false)}
         locations={locations}
         onExport={(data) => {
-          console.log('Export:', data);
+          exportMutation.mutate(data);
           setShowExportModal(false);
         }}
       />
+
+      {/* Disconnect Confirmation Dialog */}
+      <Dialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disconnect Square Account?</DialogTitle>
+            <DialogDescription>
+              This will revoke TipFlow's access to your Square account and stop syncing new data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertCircle className="w-4 h-4 text-amber-600" />
+              <AlertDescription className="text-amber-900">
+                <strong>Historical data will be preserved.</strong> All existing tip allocations, 
+                exports, and audit logs will remain accessible for compliance purposes.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDisconnectDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect Square'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
