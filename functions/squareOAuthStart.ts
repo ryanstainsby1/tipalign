@@ -14,6 +14,12 @@ Deno.serve(async (req) => {
     const SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT') || 'sandbox';
     const BASE_URL = Deno.env.get('BASE_URL') || req.headers.get('origin') || 'http://localhost:5173';
 
+    console.log('Square OAuth Config:', {
+      app_id: SQUARE_APP_ID?.substring(0, 10) + '...',
+      environment: SQUARE_ENVIRONMENT,
+      base_url: BASE_URL
+    });
+
     if (!SQUARE_APP_ID) {
       return Response.json({ error: 'Square application not configured' }, { status: 500 });
     }
@@ -61,11 +67,18 @@ Deno.serve(async (req) => {
 
     const redirectUrl = `${authUrl}?${params.toString()}`;
 
+    console.log('Square OAuth redirect:', {
+      callback_url: callbackUrl,
+      redirect_url: redirectUrl.substring(0, 100) + '...'
+    });
+
     // Return redirect URL (frontend will handle the redirect)
     return Response.json({ 
       success: true, 
       redirect_url: redirectUrl,
-      state: state 
+      state: state,
+      callback_url: callbackUrl,
+      environment: SQUARE_ENVIRONMENT
     });
 
   } catch (error) {
