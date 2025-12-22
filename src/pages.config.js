@@ -4,6 +4,8 @@ import Employees from './pages/Employees';
 import Allocations from './pages/Allocations';
 import Compliance from './pages/Compliance';
 import Settings from './pages/Settings';
+import LocationSettings from './pages/LocationSettings';
+import EmployeePortal from './pages/EmployeePortal';
 
 
 export const PAGES = {
@@ -13,6 +15,8 @@ export const PAGES = {
     "Allocations": Allocations,
     "Compliance": Compliance,
     "Settings": Settings,
+    "LocationSettings": LocationSettings,
+    "EmployeePortal": EmployeePortal,
 }
 
 export const pagesConfig = {
