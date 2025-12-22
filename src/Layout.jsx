@@ -12,7 +12,8 @@ import {
   X,
   LogOut,
   ChevronRight,
-  User
+  User,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -100,11 +101,18 @@ export default function Layout({ children, currentPageName }) {
             })}
           </nav>
 
-          {/* Employee Portal Link */}
-          <div className="px-3 py-2">
+          {/* Additional Links */}
+          <div className="px-3 py-2 space-y-1 border-t border-slate-100">
+            <Link
+              to={createPageUrl('Reconciliation')}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            >
+              <RefreshCw className="w-5 h-5 text-slate-400" />
+              Reconciliation
+            </Link>
             <Link
               to={createPageUrl('EmployeePortal')}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-dashed border-slate-200"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             >
               <User className="w-5 h-5 text-slate-400" />
               Employee Portal
