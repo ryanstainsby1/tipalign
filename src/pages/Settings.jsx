@@ -186,7 +186,7 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   Square Integration
-                  {isSquareConnected && (
+                  {squareConnection && (
                     <Badge className="bg-emerald-100 text-emerald-700">Connected</Badge>
                   )}
                 </CardTitle>
