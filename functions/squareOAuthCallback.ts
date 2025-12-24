@@ -1,6 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
+  console.log('=== CALLBACK FUNCTION INVOKED ===');
+  console.log('Request URL:', req.url);
+  
   const url = new URL(req.url);
   const origin = url.origin;
 
