@@ -136,13 +136,17 @@ export default function Dashboard() {
 
   const connectMutation = useMutation({
     mutationFn: async () => {
-      console.log('Starting Square connection...');
+      // Check if user is authenticated
+      const isAuth = await base44.auth.isAuthenticated();
+      if (!isAuth) {
+        base44.auth.redirectToLogin(window.location.pathname);
+        throw new Error('Please log in to connect Square');
+      }
+      
       const response = await base44.functions.invoke('squareOAuthStart', {});
-      console.log('Response received:', response);
       return response.data;
     },
     onSuccess: (data) => {
-      console.log('Connection success, redirecting to:', data.redirect_url);
       if (data.success && data.redirect_url) {
         window.location.href = data.redirect_url;
       } else {
@@ -150,8 +154,9 @@ export default function Dashboard() {
       }
     },
     onError: (error) => {
-      console.error('Connection error:', error);
-      logError({ page: 'Dashboard', action: 'connectSquare', error });
+      if (!error.message.includes('log in')) {
+        logError({ page: 'Dashboard', action: 'connectSquare', error });
+      }
       toast.error('Connection failed: ' + error.message);
     }
   });
