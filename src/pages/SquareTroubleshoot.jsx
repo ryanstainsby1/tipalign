@@ -56,6 +56,13 @@ export default function SquareTroubleshoot() {
     }
   });
 
+  const debugMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('debugSquareCredentials', {});
+      return response.data;
+    }
+  });
+
   const testMutation = useMutation({
     mutationFn: async () => {
       const response = await base44.functions.invoke('squareOAuthStart', {});
@@ -165,81 +172,80 @@ export default function SquareTroubleshoot() {
             </div>
           </CardHeader>
           <CardContent>
-            <Button
-              onClick={() => testCredentialsMutation.mutate()}
-              disabled={testCredentialsMutation.isPending}
-              className="bg-rose-600 hover:bg-rose-700"
-            >
-              {testCredentialsMutation.isPending ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Testing with Square...
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-4 h-4 mr-2" />
-                  Test Credentials
-                </>
-              )}
-            </Button>
-
-            {testCredentialsMutation.data && !testCredentialsMutation.data.success && (
-              <Alert className="mt-4 border-amber-200 bg-amber-50">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <AlertDescription className="text-amber-900">
-                  <p className="font-semibold mb-2">⚠️ Secret Update Checklist:</p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono">1.</span>
-                      <div>Go to Square Dashboard → Applications → OAuth</div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono">2.</span>
-                      <div>Click "Show" on Application Secret, then "Replace Secret"</div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono">3.</span>
-                      <div>Copy the ENTIRE secret (no spaces before/after)</div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono">4.</span>
-                      <div>Go to Base44 Settings → Secrets → Edit SQUARE_APP_SECRET</div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono">5.</span>
-                      <div>Paste and click "Update Secret"</div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono">6.</span>
-                      <div className="font-semibold text-rose-700">Wait 10 seconds for changes to deploy</div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono">7.</span>
-                      <div>Click "Test Credentials" again</div>
-                    </div>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {testCredentialsMutation.data && (
-              <Alert className={`mt-4 ${testCredentialsMutation.data.success ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
-                {testCredentialsMutation.data.success ? (
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+            <div className="flex gap-3">
+              <Button
+                onClick={() => debugMutation.mutate()}
+                disabled={debugMutation.isPending}
+                className="bg-rose-600 hover:bg-rose-700"
+              >
+                {debugMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Running diagnostics...
+                  </>
                 ) : (
-                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <>
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Run Full Diagnostic
+                  </>
                 )}
-                <AlertDescription className={testCredentialsMutation.data.success ? 'text-emerald-900' : 'text-rose-900'}>
-                  <p className="font-semibold">{testCredentialsMutation.data.message}</p>
-                  {testCredentialsMutation.data.details && (
-                    <div className="mt-2 space-y-1 text-sm">
-                      {testCredentialsMutation.data.details.map((detail, i) => (
-                        <div key={i}>{detail}</div>
-                      ))}
-                    </div>
+              </Button>
+            </div>
+
+            {debugMutation.data && (
+              <div className="mt-4 space-y-4">
+                <Alert className={debugMutation.data.success ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}>
+                  {debugMutation.data.success ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-rose-600" />
                   )}
-                </AlertDescription>
-              </Alert>
+                  <AlertDescription className={debugMutation.data.success ? 'text-emerald-900' : 'text-rose-900'}>
+                    <p className="font-semibold text-base mb-2">{debugMutation.data.message}</p>
+                    {debugMutation.data.details && (
+                      <div className="space-y-1 text-sm">
+                        {debugMutation.data.details.map((detail, i) => (
+                          <div key={i}>{detail}</div>
+                        ))}
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+
+                {debugMutation.data.diagnostics && (
+                  <Card className="border-slate-200">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Diagnostic Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 text-xs font-mono">
+                        <div>
+                          <p className="font-semibold text-slate-600 mb-1">Credentials Loaded:</p>
+                          <pre className="bg-slate-50 p-2 rounded">
+                            {JSON.stringify(debugMutation.data.diagnostics.credentials_loaded, null, 2)}
+                          </pre>
+                        </div>
+                        {debugMutation.data.diagnostics.validation && (
+                          <div>
+                            <p className="font-semibold text-slate-600 mb-1">Validation:</p>
+                            <pre className="bg-slate-50 p-2 rounded">
+                              {JSON.stringify(debugMutation.data.diagnostics.validation, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                        {debugMutation.data.troubleshooting && (
+                          <div>
+                            <p className="font-semibold text-slate-600 mb-1">Troubleshooting Info:</p>
+                            <pre className="bg-slate-50 p-2 rounded">
+                              {JSON.stringify(debugMutation.data.troubleshooting, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
