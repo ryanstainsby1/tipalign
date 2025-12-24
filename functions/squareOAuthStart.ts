@@ -11,7 +11,13 @@ Deno.serve(async (req) => {
     }
 
     const SQUARE_APP_ID = Deno.env.get('SQUARE_APP_ID');
-    const SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT') || 'sandbox';
+    let SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT') || 'sandbox';
+
+    // If APP_ID starts with 'sandbox-', force sandbox environment
+    if (SQUARE_APP_ID?.startsWith('sandbox-')) {
+      SQUARE_ENVIRONMENT = 'sandbox';
+    }
+
     const BASE_URL = Deno.env.get('BASE_URL') || req.headers.get('origin') || 'http://localhost:5173';
 
     console.log('Square OAuth Config:', {
