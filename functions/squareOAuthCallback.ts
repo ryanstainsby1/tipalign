@@ -1,58 +1,98 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 Deno.serve(async (req) => {
+  const url = new URL(req.url);
+  const origin = url.origin;
+
   try {
     const base44 = createClientFromRequest(req);
-    const url = new URL(req.url);
     
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
     const errorDescription = url.searchParams.get('error_description');
 
+    console.log('OAuth callback received:', {
+      has_code: !!code,
+      has_state: !!state,
+      error: error,
+      error_description: errorDescription
+    });
+
     // Handle OAuth errors
     if (error) {
       console.error('Square OAuth error:', error, errorDescription);
-      const redirectUrl = `${url.origin}/Dashboard?square_error=${encodeURIComponent(errorDescription || error)}`;
+      const redirectUrl = `${origin}/Welcome?error=${encodeURIComponent(error)}&error_description=${encodeURIComponent(errorDescription || '')}`;
       return Response.redirect(redirectUrl, 302);
     }
 
     if (!code || !state) {
-      const redirectUrl = `${url.origin}/Dashboard?square_error=missing_code_or_state`;
+      console.error('Missing code or state');
+      const redirectUrl = `${origin}/Welcome?error=missing_parameters`;
       return Response.redirect(redirectUrl, 302);
     }
 
     // Decode and validate state
     let stateData;
     try {
-      const stateString = Buffer.from(state, 'base64url').toString('utf-8');
+      const stateString = atob(state.replace(/-/g, '+').replace(/_/g, '/'));
       stateData = JSON.parse(stateString);
+      console.log('State decoded:', {
+        user_id: stateData.user_id,
+        org_id: stateData.org_id,
+        age_minutes: (Date.now() - stateData.timestamp) / (1000 * 60)
+      });
     } catch (err) {
       console.error('Invalid state parameter:', err);
-      const redirectUrl = `${url.origin}/Dashboard?square_error=invalid_state`;
+      const redirectUrl = `${origin}/Welcome?error=invalid_state`;
       return Response.redirect(redirectUrl, 302);
     }
 
     // Validate state timestamp (10 minute expiry)
     const stateAge = Date.now() - stateData.timestamp;
     if (stateAge > 10 * 60 * 1000) {
-      const redirectUrl = `${url.origin}/Dashboard?square_error=state_expired`;
+      console.error('State expired:', { age_minutes: stateAge / (1000 * 60) });
+      const redirectUrl = `${origin}/Welcome?error=state_expired`;
+      return Response.redirect(redirectUrl, 302);
+    }
+
+    // Verify state exists in audit log (extra security)
+    const auditEvents = await base44.asServiceRole.entities.SystemAuditEvent.filter({
+      organization_id: stateData.org_id,
+      event_type: 'square_connect_started',
+      actor_user_id: stateData.user_id
+    }, '-created_date', 5);
+
+    const validState = auditEvents.find(e => 
+      e.after_snapshot?.state_token === state &&
+      new Date(e.after_snapshot?.expires_at) > new Date()
+    );
+
+    if (!validState) {
+      console.error('State not found in audit log or expired');
+      const redirectUrl = `${origin}/Welcome?error=invalid_state_token`;
       return Response.redirect(redirectUrl, 302);
     }
 
     // Exchange code for access token
     const SQUARE_APP_ID = Deno.env.get('SQUARE_APP_ID');
     const SQUARE_APP_SECRET = Deno.env.get('SQUARE_APP_SECRET');
-    const SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT') || 'sandbox';
+    const SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT')?.toLowerCase() || 'production';
 
     if (!SQUARE_APP_ID || !SQUARE_APP_SECRET) {
-      const redirectUrl = `${url.origin}/Dashboard?square_error=missing_credentials`;
+      console.error('Missing Square credentials');
+      const redirectUrl = `${origin}/Welcome?error=missing_configuration`;
       return Response.redirect(redirectUrl, 302);
     }
 
     const tokenUrl = SQUARE_ENVIRONMENT === 'production'
       ? 'https://connect.squareup.com/oauth2/token'
       : 'https://connect.squareupsandbox.com/oauth2/token';
+
+    console.log('Exchanging code for token:', { 
+      token_url: tokenUrl,
+      environment: SQUARE_ENVIRONMENT 
+    });
 
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
@@ -71,7 +111,7 @@ Deno.serve(async (req) => {
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
       console.error('Square token exchange failed:', errorData);
-      const redirectUrl = `${url.origin}/Dashboard?square_error=token_exchange_failed`;
+      const redirectUrl = `${origin}/Welcome?error=token_exchange_failed&details=${encodeURIComponent(JSON.stringify(errorData))}`;
       return Response.redirect(redirectUrl, 302);
     }
 
@@ -81,24 +121,32 @@ Deno.serve(async (req) => {
     const expiresAt = tokenData.expires_at;
     const merchantId = tokenData.merchant_id;
 
+    console.log('Token received:', {
+      merchant_id: merchantId,
+      has_access_token: !!accessToken,
+      has_refresh_token: !!refreshToken,
+      expires_at: expiresAt
+    });
+
     // Get merchant profile
     const profileUrl = SQUARE_ENVIRONMENT === 'production'
-      ? 'https://connect.squareup.com/v2/merchants'
-      : 'https://connect.squareupsandbox.com/v2/merchants';
+      ? `https://connect.squareup.com/v2/merchants/${merchantId}`
+      : `https://connect.squareupsandbox.com/v2/merchants/${merchantId}`;
 
-    const profileResponse = await fetch(`${profileUrl}/${merchantId}`, {
+    const profileResponse = await fetch(profileUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Square-Version': '2024-12-18'
       }
     });
 
-    let merchantName = 'Unknown';
+    let merchantName = 'Unknown Merchant';
     let merchantCountry = 'GB';
     if (profileResponse.ok) {
       const profileData = await profileResponse.json();
       merchantName = profileData.merchant?.business_name || merchantName;
       merchantCountry = profileData.merchant?.country || merchantCountry;
+      console.log('Merchant profile:', { name: merchantName, country: merchantCountry });
     }
 
     // Store or update connection
@@ -110,6 +158,7 @@ Deno.serve(async (req) => {
     let connection;
     if (existingConnections.length > 0) {
       connection = existingConnections[0];
+      console.log('Updating existing connection:', connection.id);
       await base44.asServiceRole.entities.SquareConnection.update(connection.id, {
         square_access_token_encrypted: accessToken,
         square_refresh_token_encrypted: refreshToken || '',
@@ -121,6 +170,7 @@ Deno.serve(async (req) => {
         last_error_at: null
       });
     } else {
+      console.log('Creating new connection');
       connection = await base44.asServiceRole.entities.SquareConnection.create({
         organization_id: stateData.org_id,
         square_merchant_id: merchantId,
@@ -144,13 +194,15 @@ Deno.serve(async (req) => {
       entity_id: connection.id,
       after_snapshot: {
         merchant_id: merchantId,
-        merchant_name: merchantName
+        merchant_name: merchantName,
+        environment: SQUARE_ENVIRONMENT
       },
       changes_summary: `Square account connected: ${merchantName}`,
       severity: 'info'
     });
 
-    // Trigger bootstrap sync
+    // Trigger initial sync
+    console.log('Starting initial sync...');
     let syncSuccess = false;
     let syncResults = null;
     let locationsCount = 0;
@@ -163,10 +215,10 @@ Deno.serve(async (req) => {
       });
       syncResults = syncResponse.data;
       syncSuccess = syncResults.success;
-      locationsCount = syncResults.records_created || 0;
-      staffCount = syncResults.records_updated || 0;
+
+      console.log('Sync results:', syncResults);
       
-      // Count actual entities synced
+      // Count synced entities
       const locations = await base44.asServiceRole.entities.Location.filter({
         organization_id: stateData.org_id
       });
@@ -178,13 +230,12 @@ Deno.serve(async (req) => {
       staffCount = employees.length;
       
     } catch (syncError) {
-      console.error('Bootstrap sync failed:', syncError);
-      // Log error but don't fail the connection
+      console.error('Initial sync failed:', syncError);
       await base44.asServiceRole.entities.AppError.create({
         organization_id: stateData.org_id,
         user_id: stateData.user_id,
         page: 'OAuth Callback',
-        action_name: 'bootstrap_sync',
+        action_name: 'initial_sync',
         error_message: syncError.message,
         error_stack: syncError.stack,
         severity: 'warning',
@@ -195,7 +246,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Redirect back to dashboard with sync status
+    // Redirect to dashboard with success
     const params = new URLSearchParams({
       square_connected: '1',
       merchant: merchantName,
@@ -204,13 +255,20 @@ Deno.serve(async (req) => {
       staff_synced: staffCount.toString()
     });
     
-    const redirectUrl = `${url.origin}/Dashboard?${params.toString()}`;
+    const redirectUrl = `${origin}/Dashboard?${params.toString()}`;
+    console.log('Redirecting to:', redirectUrl);
     return Response.redirect(redirectUrl, 302);
 
   } catch (error) {
     console.error('Square OAuth callback error:', error);
-    const url = new URL(req.url);
-    const redirectUrl = `${url.origin}/Dashboard?square_error=unexpected_error`;
+    await base44.asServiceRole.entities.AppError.create({
+      page: 'OAuth Callback',
+      action_name: 'square_oauth_callback',
+      error_message: error.message,
+      error_stack: error.stack,
+      severity: 'error'
+    });
+    const redirectUrl = `${origin}/Welcome?error=unexpected_error`;
     return Response.redirect(redirectUrl, 302);
   }
 });

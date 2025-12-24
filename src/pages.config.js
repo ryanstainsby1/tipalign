@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import SmokeTest from './pages/SmokeTest';
 import SquareReviewPack from './pages/SquareReviewPack';
 import SystemStatus from './pages/SystemStatus';
+import Welcome from './pages/Welcome';
 import __Layout from './Layout.jsx';
 
 
@@ -42,6 +43,7 @@ export const PAGES = {
     "SmokeTest": SmokeTest,
     "SquareReviewPack": SquareReviewPack,
     "SystemStatus": SystemStatus,
+    "Welcome": Welcome,
 }
 
 export const pagesConfig = {
