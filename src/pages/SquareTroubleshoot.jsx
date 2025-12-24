@@ -49,6 +49,13 @@ export default function SquareTroubleshoot() {
     }
   });
 
+  const testCredentialsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('testSquareCredentials', {});
+      return response.data;
+    }
+  });
+
   const testMutation = useMutation({
     mutationFn: async () => {
       const response = await base44.functions.invoke('squareOAuthStart', {});
@@ -94,17 +101,22 @@ export default function SquareTroubleshoot() {
           <p className="text-slate-500 mt-1">Diagnose and fix Square connection issues</p>
         </div>
 
-        {/* Validation Check */}
+        {/* Step 1: Validate Format */}
         <Card className="mb-6 border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Validate Configuration</CardTitle>
-            <CardDescription>Check if your Application ID matches the environment</CardDescription>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">1</div>
+              <div>
+                <CardTitle>Validate Configuration Format</CardTitle>
+                <CardDescription>Check if your Application ID matches the environment</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Button
               onClick={() => validateMutation.mutate()}
               disabled={validateMutation.isPending}
-              className="bg-rose-600 hover:bg-rose-700"
+              className="bg-indigo-600 hover:bg-indigo-700"
             >
               {validateMutation.isPending ? (
                 <>
@@ -114,7 +126,7 @@ export default function SquareTroubleshoot() {
               ) : (
                 <>
                   <AlertTriangle className="w-4 h-4 mr-2" />
-                  Validate App ID & Environment
+                  Check Format
                 </>
               )}
             </Button>
@@ -141,17 +153,82 @@ export default function SquareTroubleshoot() {
           </CardContent>
         </Card>
 
-        {/* Test Connection Button */}
+        {/* Step 2: Test Credentials */}
         <Card className="mb-6 border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Test Square OAuth Configuration</CardTitle>
-            <CardDescription>Run a test to see if your Square settings are correct</CardDescription>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm">2</div>
+              <div>
+                <CardTitle>Test Credentials with Square API</CardTitle>
+                <CardDescription>Verify Square recognizes your Application ID and Secret</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => testCredentialsMutation.mutate()}
+              disabled={testCredentialsMutation.isPending}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              {testCredentialsMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Testing with Square...
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Test Credentials
+                </>
+              )}
+            </Button>
+
+            {testCredentialsMutation.data && (
+              <Alert className={`mt-4 ${testCredentialsMutation.data.success ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+                {testCredentialsMutation.data.success ? (
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                )}
+                <AlertDescription className={testCredentialsMutation.data.success ? 'text-emerald-900' : 'text-rose-900'}>
+                  <p className="font-semibold">{testCredentialsMutation.data.message}</p>
+                  {testCredentialsMutation.data.details && (
+                    <div className="mt-2 space-y-1 text-sm">
+                      {testCredentialsMutation.data.details.map((detail, i) => (
+                        <div key={i}>{detail}</div>
+                      ))}
+                    </div>
+                  )}
+                  {testCredentialsMutation.data.recommendations && (
+                    <div className="mt-3 p-3 bg-white rounded border border-rose-200">
+                      <p className="font-medium text-sm mb-2">How to fix:</p>
+                      {testCredentialsMutation.data.recommendations.map((rec, i) => (
+                        <div key={i} className="text-sm">{rec}</div>
+                      ))}
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Step 3: Test OAuth Flow */}
+        <Card className="mb-6 border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">3</div>
+              <div>
+                <CardTitle>Test OAuth Flow</CardTitle>
+                <CardDescription>Run a test to see if your Square settings are correct</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Button
               onClick={handleTest}
               disabled={testing || testMutation.isPending}
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
               {testing || testMutation.isPending ? (
                 <>
