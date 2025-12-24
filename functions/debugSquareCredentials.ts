@@ -22,16 +22,18 @@ Deno.serve(async (req) => {
       credentials_loaded: {
         app_id_exists: !!SQUARE_APP_ID,
         app_id_length: SQUARE_APP_ID?.length || 0,
-        app_id_prefix: SQUARE_APP_ID?.substring(0, 15) || 'NOT SET',
+        app_id_full: SQUARE_APP_ID || 'NOT SET',
         app_secret_exists: !!SQUARE_APP_SECRET,
         app_secret_length: SQUARE_APP_SECRET?.length || 0,
-        app_secret_first_4: SQUARE_APP_SECRET?.substring(0, 4) || 'NOT SET',
+        app_secret_first_10: SQUARE_APP_SECRET?.substring(0, 10) || 'NOT SET',
         app_secret_last_4: SQUARE_APP_SECRET?.substring(SQUARE_APP_SECRET?.length - 4) || 'NOT SET',
         environment: SQUARE_ENVIRONMENT,
         base_url: BASE_URL
       },
       validation: {
         app_id_format: SQUARE_APP_ID?.startsWith('sq0idp-') ? 'production' : SQUARE_APP_ID?.startsWith('sandbox-') ? 'sandbox' : 'invalid',
+        app_id_too_short: SQUARE_APP_ID?.length < 35,
+        expected_app_id_length: '35-45 characters',
         secret_starts_with: SQUARE_APP_SECRET?.substring(0, 10) || 'NOT SET',
         secret_has_spaces: SQUARE_APP_SECRET?.includes(' ') || false,
         secret_has_newlines: SQUARE_APP_SECRET?.includes('\n') || false,
@@ -44,6 +46,33 @@ Deno.serve(async (req) => {
         message: '❌ Missing credentials',
         diagnostics,
         action: 'Set both SQUARE_APP_ID and SQUARE_APP_SECRET in Base44 secrets'
+      });
+    }
+
+    // Check if App ID is truncated
+    if (SQUARE_APP_ID.length < 35) {
+      return Response.json({
+        success: false,
+        message: '❌ Application ID is TRUNCATED',
+        details: [
+          `Your SQUARE_APP_ID is only ${SQUARE_APP_ID.length} characters long`,
+          'Square production App IDs are typically 35-45 characters',
+          '',
+          '🔍 YOUR APP ID IN BASE44:',
+          SQUARE_APP_ID,
+          '',
+          '✅ WHAT TO DO:',
+          '1. In Square Dashboard, copy the FULL Application ID',
+          '   (it should look like: sq0idp-Ty2i6HdNSZE3R1h9_Uprgq)',
+          '2. Go to Base44 → Settings → Secrets',
+          '3. Edit SQUARE_APP_ID',
+          '4. Paste the COMPLETE ID (make sure nothing is cut off)',
+          '5. Click "Update Secret"',
+          '6. Wait 15 seconds',
+          '7. Run diagnostic again'
+        ],
+        diagnostics,
+        problem: 'TRUNCATED_APP_ID'
       });
     }
 
