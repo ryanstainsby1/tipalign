@@ -274,4 +274,4 @@ Deno.serve(async (req) => {
     const redirectUrl = `${origin}/Welcome?error=unexpected_error`;
     return Response.redirect(redirectUrl, 302);
   }
-});
+ });
