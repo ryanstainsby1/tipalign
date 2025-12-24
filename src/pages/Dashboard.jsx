@@ -286,6 +286,18 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Connection Status Alert */}
+        {React.useEffect(() => {
+          const urlParams = new URLSearchParams(window.location.search);
+          const error = urlParams.get('error');
+          const errorDescription = urlParams.get('error_description');
+
+          if (error) {
+            toast.error(`Connection failed: ${errorDescription || error.replace(/_/g, ' ')}`);
+            window.history.replaceState({}, '', '/Dashboard');
+          }
+        }, [])}
+
         {/* Square Connection */}
         {loadingConnection ? (
           <div className="mb-8 bg-white rounded-xl p-6 shadow-sm">
@@ -437,6 +449,45 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {/* Empty State - No Data */}
+        {!squareConnection && transactions.length === 0 && employees.length === 0 && (
+          <Card className="mb-8 border-0 shadow-sm">
+            <CardContent className="p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">Connect Square to Get Started</h3>
+                <p className="text-slate-600 mb-6">
+                  Link your Square account to automatically import locations, staff, and transactions.
+                </p>
+                <Button
+                  onClick={() => connectMutation.mutate()}
+                  disabled={connectMutation.isPending}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                  size="lg"
+                >
+                  {connectMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="4" y="4" width="16" height="16" rx="2"/>
+                      </svg>
+                      Connect with Square
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <MetricCard
@@ -472,33 +523,37 @@ export default function Dashboard() {
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <TipTrendChart data={last14Days} title="Tips Over Last 14 Days" />
-          </div>
-          <AllocationBreakdown 
-            data={breakdownData.length > 0 ? breakdownData : [{ name: 'No data', value: 1 }]} 
-            title="Tips by Role" 
-          />
-        </div>
-
-        {/* Bottom Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <RecentTransactions transactions={transactions} />
-          </div>
-          <div className="space-y-6">
-            {squareConnection && recentSyncJobs.length > 0 && (
-              <SyncHistory syncJobs={recentSyncJobs} />
-            )}
-            <ComplianceStatus
-              hmrcReady={true}
-              lastExport="15 Jan 2025"
-              pendingAllocations={pendingAllocations}
-              auditScore={98}
+        {(transactions.length > 0 || allocations.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2">
+              <TipTrendChart data={last14Days} title="Tips Over Last 14 Days" />
+            </div>
+            <AllocationBreakdown 
+              data={breakdownData.length > 0 ? breakdownData : [{ name: 'No data', value: 1 }]} 
+              title="Tips by Role" 
             />
           </div>
-        </div>
+        )}
+
+        {/* Bottom Row */}
+        {(transactions.length > 0 || squareConnection) && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <RecentTransactions transactions={transactions} />
+            </div>
+            <div className="space-y-6">
+              {squareConnection && recentSyncJobs.length > 0 && (
+                <SyncHistory syncJobs={recentSyncJobs} />
+              )}
+              <ComplianceStatus
+                hmrcReady={transactions.length > 0}
+                lastExport={transactions.length > 0 ? "Not yet exported" : "No data"}
+                pendingAllocations={pendingAllocations}
+                auditScore={transactions.length > 0 ? 98 : 0}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <PayrollExportModal
