@@ -63,6 +63,13 @@ export default function SquareTroubleshoot() {
     }
   });
 
+  const inspectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('inspectSquareCredentials', {});
+      return response.data;
+    }
+  });
+
   const testMutation = useMutation({
     mutationFn: async () => {
       const response = await base44.functions.invoke('squareOAuthStart', {});
@@ -190,6 +197,22 @@ export default function SquareTroubleshoot() {
                   </>
                 )}
               </Button>
+
+              <Button
+                onClick={() => inspectMutation.mutate()}
+                disabled={inspectMutation.isPending}
+                variant="outline"
+                className="border-rose-300"
+              >
+                {inspectMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Inspecting...
+                  </>
+                ) : (
+                  'Inspect Credentials'
+                )}
+              </Button>
             </div>
 
             {debugMutation.data && (
@@ -241,6 +264,70 @@ export default function SquareTroubleshoot() {
                             </pre>
                           </div>
                         )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {inspectMutation.data && (
+                  <Card className="mt-4 border-slate-200">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Character-by-Character Inspection</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Alert className={inspectMutation.data.diagnosis?.credentials_valid ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}>
+                        {inspectMutation.data.diagnosis?.credentials_valid ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 text-emerald-600" />
+                            <AlertDescription className="text-emerald-900">
+                              ✅ Your credentials ARE VALID! Square accepts them. The 401 error is something else.
+                            </AlertDescription>
+                          </>
+                        ) : inspectMutation.data.diagnosis?.credentials_rejected ? (
+                          <>
+                            <XCircle className="w-4 h-4 text-rose-600" />
+                            <AlertDescription className="text-rose-900">
+                              <strong>Square is rejecting your credentials (HTTP 401)</strong>
+                              <div className="mt-2 space-y-1 text-sm">
+                                <p>Your SQUARE_APP_ID in Base44: <code className="bg-white px-2 py-1 rounded">{inspectMutation.data.credentials_inspection?.app_id?.full_value}</code></p>
+                                <p className="text-rose-700 font-semibold mt-3">This ID does NOT match what's in your Square Dashboard screenshot (ends with 'q' not 'gg')</p>
+                                <p className="mt-3">ACTION: Copy the App ID from Square Dashboard AGAIN - character by character - and paste into Base44</p>
+                              </div>
+                            </AlertDescription>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            <AlertDescription className="text-amber-900">
+                              Unknown status - check raw data below
+                            </AlertDescription>
+                          </>
+                        )}
+                      </Alert>
+
+                      <div className="text-xs font-mono space-y-3">
+                        <div>
+                          <p className="font-semibold text-slate-600 mb-1">App ID Details:</p>
+                          <pre className="bg-slate-50 p-3 rounded overflow-x-auto">
+                            {JSON.stringify(inspectMutation.data.credentials_inspection?.app_id, null, 2)}
+                          </pre>
+                        </div>
+                        
+                        {inspectMutation.data.diagnosis?.whitespace_issues && (
+                          <Alert className="border-amber-200 bg-amber-50">
+                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            <AlertDescription className="text-amber-900">
+                              ⚠️ Hidden whitespace or special characters detected in your credentials!
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div>
+                          <p className="font-semibold text-slate-600 mb-1">Square API Response:</p>
+                          <pre className="bg-slate-50 p-3 rounded overflow-x-auto">
+                            {JSON.stringify(inspectMutation.data.square_test, null, 2)}
+                          </pre>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
