@@ -193,6 +193,16 @@ export default function Settings() {
                 <CardDescription>Sync transactions, employees, and locations from Square</CardDescription>
               </CardHeader>
               <CardContent>
+                <SyncScheduleConfig squareConnection={squareConnection} />
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle>Manual Sync</CardTitle>
+                <CardDescription>Sync Square data on-demand</CardDescription>
+              </CardHeader>
+              <CardContent>
                 {loadingConnection ? (
                   <div className="animate-pulse space-y-4">
                     <div className="h-16 bg-slate-200 rounded-xl"></div>

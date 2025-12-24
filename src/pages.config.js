@@ -15,9 +15,9 @@ import Locations from './pages/Locations';
 import Reconciliation from './pages/Reconciliation';
 import RulesBuilder from './pages/RulesBuilder';
 import Settings from './pages/Settings';
+import SmokeTest from './pages/SmokeTest';
 import SquareReviewPack from './pages/SquareReviewPack';
 import SystemStatus from './pages/SystemStatus';
-import SmokeTest from './pages/SmokeTest';
 import __Layout from './Layout.jsx';
 
 
@@ -39,9 +39,9 @@ export const PAGES = {
     "Reconciliation": Reconciliation,
     "RulesBuilder": RulesBuilder,
     "Settings": Settings,
+    "SmokeTest": SmokeTest,
     "SquareReviewPack": SquareReviewPack,
     "SystemStatus": SystemStatus,
-    "SmokeTest": SmokeTest,
 }
 
 export const pagesConfig = {
