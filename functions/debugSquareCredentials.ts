@@ -49,32 +49,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if App ID is truncated
-    if (SQUARE_APP_ID.length < 35) {
-      return Response.json({
-        success: false,
-        message: '❌ Application ID is TRUNCATED',
-        details: [
-          `Your SQUARE_APP_ID is only ${SQUARE_APP_ID.length} characters long`,
-          'Square production App IDs are typically 35-45 characters',
-          '',
-          '🔍 YOUR APP ID IN BASE44:',
-          SQUARE_APP_ID,
-          '',
-          '✅ WHAT TO DO:',
-          '1. In Square Dashboard, copy the FULL Application ID',
-          '   (it should look like: sq0idp-Ty2i6HdNSZE3R1h9_Uprgq)',
-          '2. Go to Base44 → Settings → Secrets',
-          '3. Edit SQUARE_APP_ID',
-          '4. Paste the COMPLETE ID (make sure nothing is cut off)',
-          '5. Click "Update Secret"',
-          '6. Wait 15 seconds',
-          '7. Run diagnostic again'
-        ],
-        diagnostics,
-        problem: 'TRUNCATED_APP_ID'
-      });
-    }
+    // Square App IDs can vary in length, so let's just test them
 
     // Test with Square API
     const authUrl = SQUARE_ENVIRONMENT === 'production'
