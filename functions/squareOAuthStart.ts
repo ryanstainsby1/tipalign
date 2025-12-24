@@ -13,9 +13,12 @@ Deno.serve(async (req) => {
     const SQUARE_APP_ID = Deno.env.get('SQUARE_APP_ID');
     let SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT') || 'sandbox';
 
-    // If APP_ID starts with 'sandbox-', force sandbox environment
+    // Temporarily force production to test if sandbox is down
+    // If APP_ID starts with 'sandbox-', keep sandbox, otherwise use production
     if (SQUARE_APP_ID?.startsWith('sandbox-')) {
       SQUARE_ENVIRONMENT = 'sandbox';
+    } else {
+      SQUARE_ENVIRONMENT = 'production';
     }
 
     const BASE_URL = Deno.env.get('BASE_URL') || req.headers.get('origin') || 'http://localhost:5173';
