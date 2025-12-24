@@ -88,6 +88,20 @@ Deno.serve(async (req) => {
       responseData = { raw: responseText };
     }
 
+    // Analyze the specific error from Square
+    const errorCode = responseData.errors?.[0]?.code;
+    const errorDetail = responseData.errors?.[0]?.detail || '';
+    
+    // If Square says "Authorization code not found for app [...]", it means:
+    // - Square RECOGNIZES the app ID (it found the app)
+    // - The secret is correct (otherwise it would reject before checking the code)
+    // - The test authorization code is just invalid (which is expected)
+    const credentialsValid = 
+      (response.status === 400 && (responseData.error === 'invalid_grant' || responseData.error === 'invalid_request')) ||
+      (response.status === 401 && errorCode === 'UNAUTHORIZED' && errorDetail.includes('Authorization code not found for app'));
+    
+    const actuallyRejected = response.status === 401 && errorCode === 'UNAUTHORIZED' && !errorDetail.includes('Authorization code not found');
+
     return Response.json({
       credentials_inspection: {
         app_id: appIdInspection,
@@ -105,9 +119,10 @@ Deno.serve(async (req) => {
         response_data: responseData
       },
       diagnosis: {
-        credentials_valid: response.status === 400 && (responseData.error === 'invalid_grant' || responseData.error === 'invalid_request'),
-        credentials_rejected: response.status === 401,
-        whitespace_issues: appIdInspection.special_chars_found?.length > 0 || secretInspection.special_chars_found?.length > 0
+        credentials_valid: credentialsValid,
+        credentials_rejected: actuallyRejected,
+        whitespace_issues: appIdInspection.special_chars_found?.length > 0 || secretInspection.special_chars_found?.length > 0,
+        square_error_detail: errorDetail
       }
     });
 

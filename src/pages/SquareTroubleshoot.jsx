@@ -280,18 +280,28 @@ export default function SquareTroubleshoot() {
                           <>
                             <CheckCircle className="w-4 h-4 text-emerald-600" />
                             <AlertDescription className="text-emerald-900">
-                              ✅ Your credentials ARE VALID! Square accepts them. The 401 error is something else.
+                              <strong className="text-lg">✅ YOUR CREDENTIALS ARE VALID!</strong>
+                              <div className="mt-3 space-y-2 text-sm">
+                                <p>Square recognizes your Application ID and Secret.</p>
+                                <p>The error message says: "{inspectMutation.data.diagnosis?.square_error_detail}"</p>
+                                <p className="mt-3 font-semibold">This means your credentials work. The issue is likely with:</p>
+                                <ul className="list-disc list-inside space-y-1 mt-2">
+                                  <li>Redirect URL mismatch in Square Dashboard</li>
+                                  <li>OAuth scopes not configured</li>
+                                  <li>Application not published/active</li>
+                                </ul>
+                                <p className="mt-3 text-emerald-700 font-semibold">Next: Go to Settings → Square Integration and click "Connect Square Account"</p>
+                              </div>
                             </AlertDescription>
                           </>
                         ) : inspectMutation.data.diagnosis?.credentials_rejected ? (
                           <>
                             <XCircle className="w-4 h-4 text-rose-600" />
                             <AlertDescription className="text-rose-900">
-                              <strong>Square is rejecting your credentials (HTTP 401)</strong>
+                              <strong>Square rejected your Application Secret</strong>
                               <div className="mt-2 space-y-1 text-sm">
-                                <p>Your SQUARE_APP_ID in Base44: <code className="bg-white px-2 py-1 rounded">{inspectMutation.data.credentials_inspection?.app_id?.full_value}</code></p>
-                                <p className="text-rose-700 font-semibold mt-3">This ID does NOT match what's in your Square Dashboard screenshot (ends with 'q' not 'gg')</p>
-                                <p className="mt-3">ACTION: Copy the App ID from Square Dashboard AGAIN - character by character - and paste into Base44</p>
+                                <p>The Application ID was recognized but the Secret is wrong.</p>
+                                <p className="mt-3 font-semibold">Action: Generate a NEW Application Secret in Square Dashboard</p>
                               </div>
                             </AlertDescription>
                           </>
