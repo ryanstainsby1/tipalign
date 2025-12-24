@@ -12,10 +12,10 @@ Deno.serve(async (req) => {
       }, { status: 401 });
     }
 
-    const SQUARE_APP_ID = Deno.env.get('SQUARE_APP_ID');
-    const SQUARE_APP_SECRET = Deno.env.get('SQUARE_APP_SECRET');
-    const SQUARE_ENVIRONMENT = Deno.env.get('SQUARE_ENVIRONMENT')?.toLowerCase() || 'production';
-    const BASE_URL = Deno.env.get('BASE_URL');
+    const SQUARE_APP_ID = (Deno.env.get('SQUARE_APP_ID') || '').trim();
+    const SQUARE_APP_SECRET = (Deno.env.get('SQUARE_APP_SECRET') || '').trim();
+    const SQUARE_ENVIRONMENT = (Deno.env.get('SQUARE_ENVIRONMENT') || 'production').toLowerCase().trim();
+    const BASE_URL = (Deno.env.get('BASE_URL') || '').trim();
 
     // Detailed diagnostics
     const diagnostics = {
