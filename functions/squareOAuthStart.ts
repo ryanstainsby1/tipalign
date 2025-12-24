@@ -100,9 +100,16 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Square OAuth start error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      cause: error.cause
+    });
     return Response.json({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      details: error.stack
     }, { status: 500 });
   }
 });
