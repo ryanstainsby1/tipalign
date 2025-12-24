@@ -19,6 +19,7 @@ import SmokeTest from './pages/SmokeTest';
 import SquareReviewPack from './pages/SquareReviewPack';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
+import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import __Layout from './Layout.jsx';
 
 
@@ -44,6 +45,7 @@ export const PAGES = {
     "SquareReviewPack": SquareReviewPack,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
+    "SquareTroubleshoot": SquareTroubleshoot,
 }
 
 export const pagesConfig = {

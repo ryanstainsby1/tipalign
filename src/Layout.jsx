@@ -35,6 +35,7 @@ const navigation = [
   { name: 'Allocations', page: 'Allocations', icon: PieChart },
   { name: 'Compliance', page: 'Compliance', icon: Shield },
   { name: 'Settings', page: 'Settings', icon: Settings },
+  { name: 'Square Help', page: 'SquareTroubleshoot', icon: Activity },
 ];
 
 export default function Layout({ children, currentPageName }) {
