@@ -183,6 +183,45 @@ export default function SquareTroubleshoot() {
               )}
             </Button>
 
+            {testCredentialsMutation.data && !testCredentialsMutation.data.success && (
+              <Alert className="mt-4 border-amber-200 bg-amber-50">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <AlertDescription className="text-amber-900">
+                  <p className="font-semibold mb-2">⚠️ Secret Update Checklist:</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <span className="font-mono">1.</span>
+                      <div>Go to Square Dashboard → Applications → OAuth</div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-mono">2.</span>
+                      <div>Click "Show" on Application Secret, then "Replace Secret"</div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-mono">3.</span>
+                      <div>Copy the ENTIRE secret (no spaces before/after)</div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-mono">4.</span>
+                      <div>Go to Base44 Settings → Secrets → Edit SQUARE_APP_SECRET</div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-mono">5.</span>
+                      <div>Paste and click "Update Secret"</div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-mono">6.</span>
+                      <div className="font-semibold text-rose-700">Wait 10 seconds for changes to deploy</div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-mono">7.</span>
+                      <div>Click "Test Credentials" again</div>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {testCredentialsMutation.data && (
               <Alert className={`mt-4 ${testCredentialsMutation.data.success ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
                 {testCredentialsMutation.data.success ? (
@@ -196,14 +235,6 @@ export default function SquareTroubleshoot() {
                     <div className="mt-2 space-y-1 text-sm">
                       {testCredentialsMutation.data.details.map((detail, i) => (
                         <div key={i}>{detail}</div>
-                      ))}
-                    </div>
-                  )}
-                  {testCredentialsMutation.data.recommendations && (
-                    <div className="mt-3 p-3 bg-white rounded border border-rose-200">
-                      <p className="font-medium text-sm mb-2">How to fix:</p>
-                      {testCredentialsMutation.data.recommendations.map((rec, i) => (
-                        <div key={i} className="text-sm">{rec}</div>
                       ))}
                     </div>
                   )}
