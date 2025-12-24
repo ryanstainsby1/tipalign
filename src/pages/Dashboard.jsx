@@ -136,15 +136,21 @@ export default function Dashboard() {
 
   const connectMutation = useMutation({
     mutationFn: async () => {
+      console.log('Starting Square connection...');
       const response = await base44.functions.invoke('squareOAuthStart', {});
+      console.log('Response received:', response);
       return response.data;
     },
     onSuccess: (data) => {
-      if (data.redirect_url) {
+      console.log('Connection success, redirecting to:', data.redirect_url);
+      if (data.success && data.redirect_url) {
         window.location.href = data.redirect_url;
+      } else {
+        toast.error('No redirect URL received from Square');
       }
     },
     onError: (error) => {
+      console.error('Connection error:', error);
       logError({ page: 'Dashboard', action: 'connectSquare', error });
       toast.error('Connection failed: ' + error.message);
     }
