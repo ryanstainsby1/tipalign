@@ -42,6 +42,13 @@ export default function SquareTroubleshoot() {
     }
   });
 
+  const validateMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.functions.invoke('validateSquareConfig', {});
+      return response.data;
+    }
+  });
+
   const testMutation = useMutation({
     mutationFn: async () => {
       const response = await base44.functions.invoke('squareOAuthStart', {});
@@ -86,6 +93,53 @@ export default function SquareTroubleshoot() {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Square OAuth Troubleshooter</h1>
           <p className="text-slate-500 mt-1">Diagnose and fix Square connection issues</p>
         </div>
+
+        {/* Validation Check */}
+        <Card className="mb-6 border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle>Validate Configuration</CardTitle>
+            <CardDescription>Check if your Application ID matches the environment</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => validateMutation.mutate()}
+              disabled={validateMutation.isPending}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              {validateMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Validate App ID & Environment
+                </>
+              )}
+            </Button>
+
+            {validateMutation.data && (
+              <Alert className={`mt-4 ${validateMutation.data.valid ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+                {validateMutation.data.valid ? (
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                )}
+                <AlertDescription className={validateMutation.data.valid ? 'text-emerald-900' : 'text-rose-900'}>
+                  {validateMutation.data.message}
+                  {validateMutation.data.details && (
+                    <div className="mt-2 space-y-1 text-sm">
+                      {validateMutation.data.details.map((detail, i) => (
+                        <div key={i}>• {detail}</div>
+                      ))}
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Test Connection Button */}
         <Card className="mb-6 border-0 shadow-sm">

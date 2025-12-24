@@ -17,9 +17,9 @@ import RulesBuilder from './pages/RulesBuilder';
 import Settings from './pages/Settings';
 import SmokeTest from './pages/SmokeTest';
 import SquareReviewPack from './pages/SquareReviewPack';
+import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
-import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import __Layout from './Layout.jsx';
 
 
@@ -43,9 +43,9 @@ export const PAGES = {
     "Settings": Settings,
     "SmokeTest": SmokeTest,
     "SquareReviewPack": SquareReviewPack,
+    "SquareTroubleshoot": SquareTroubleshoot,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
-    "SquareTroubleshoot": SquareTroubleshoot,
 }
 
 export const pagesConfig = {
