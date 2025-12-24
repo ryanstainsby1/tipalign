@@ -106,31 +106,36 @@ Deno.serve(async (req) => {
         square_response: responseData
       });
     } else if (testResponse.status === 401) {
-      // Credentials rejected
+      // Credentials rejected - The secret is definitely wrong
       return Response.json({
         success: false,
-        message: '❌ Square rejected your credentials',
+        message: '❌ Square rejected your Application Secret',
         details: [
-          'HTTP 401 - Your Application Secret is wrong',
-          'This means:',
-          '  • The secret you entered does not match what Square has on file',
-          '  • Or the App ID and Secret are from different applications',
+          'HTTP 401 Unauthorized from Square',
           '',
-          'Solutions:',
-          '  1. In Square Dashboard, go to your application',
-          '  2. Click "Replace Secret" (don\'t just view it)',
-          '  3. Copy the NEW secret that appears',
-          '  4. Update SQUARE_APP_SECRET in Base44',
-          '  5. Wait 15 seconds, then test again'
+          '⚠️ THE PROBLEM:',
+          'The secret stored in Base44 does NOT match the secret in Square Dashboard',
+          '',
+          '✅ EXACT STEPS TO FIX:',
+          '1. In Square Dashboard (where you are now), scroll to "Application secret"',
+          '2. Click the blue "Replace" button',
+          '3. A NEW secret will appear - COPY IT IMMEDIATELY',
+          '4. Go to Base44 → Settings → Secrets → SQUARE_APP_SECRET',
+          '5. Paste the NEW secret (all ~50 characters)',
+          '6. Click "Update Secret"',
+          '7. Wait 20 seconds for Base44 to redeploy',
+          '8. Come back here and click "Run Full Diagnostic" again',
+          '',
+          '📋 CURRENT STATE:',
+          `App ID in Base44: ${SQUARE_APP_ID}`,
+          `Secret in Base44: ${SQUARE_APP_SECRET.substring(0, 10)}...${SQUARE_APP_SECRET.substring(SQUARE_APP_SECRET.length - 4)} (${SQUARE_APP_SECRET.length} chars)`,
+          '',
+          '🔍 This secret is being REJECTED by Square',
+          'You must generate and copy a NEW secret from Square Dashboard'
         ],
         diagnostics,
         square_response: responseData,
-        troubleshooting: {
-          app_id_looks_valid: SQUARE_APP_ID.startsWith('sq0idp-') || SQUARE_APP_ID.startsWith('sandbox-'),
-          secret_length: SQUARE_APP_SECRET.length,
-          expected_secret_length: 'usually 40-60 characters',
-          secret_has_whitespace: /\s/.test(SQUARE_APP_SECRET)
-        }
+        action_required: 'REPLACE_SECRET_IN_SQUARE_DASHBOARD'
       });
     } else if (testResponse.status === 400 && responseData.error === 'invalid_request') {
       return Response.json({
