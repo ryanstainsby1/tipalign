@@ -3,7 +3,20 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    console.log('Request received, attempting authentication...');
+    
+    let user;
+    try {
+      user = await base44.auth.me();
+      console.log('User authenticated:', { id: user.id, email: user.email });
+    } catch (authError) {
+      console.error('Authentication failed:', authError);
+      return Response.json({ 
+        success: false, 
+        error: 'Authentication required. Please log in.',
+        details: authError.message
+      }, { status: 401 });
+    }
 
     if (!user) {
       return Response.json({ 
