@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AllocationRuleBuilder from '@/components/allocation/AllocationRuleBuilder';
+import SyncScheduleConfig from '@/components/sync/SyncScheduleConfig';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('general');
