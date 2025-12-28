@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       organization_id: connection.organization_id,
       square_connection_id: connection_id,
       sync_type: triggered_by === 'initial_setup' ? 'full' : 'incremental',
-      entities_synced: ['locations', 'team_members', 'shifts', 'payments'],
+      entities_synced: ['locations', 'team_members', 'payments', 'payment_summaries', 'daily_summaries'],
       started_at: new Date().toISOString(),
       status: 'running',
       triggered_by
@@ -111,7 +111,6 @@ Deno.serve(async (req) => {
     const entityCounts = {
       locations: { created: 0, updated: 0, skipped: 0 },
       team_members: { created: 0, updated: 0, skipped: 0 },
-      shifts: { created: 0, updated: 0, skipped: 0 },
       payments: { created: 0, updated: 0, skipped: 0 }
     };
 
@@ -251,72 +250,227 @@ Deno.serve(async (req) => {
 
     // 3. Sync Payments (last 7 days)
     try {
-      console.log('[3/3] Syncing payments...');
+      console.log('[3/4] Syncing payments...');
       const beginTime = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const endTime = new Date().toISOString();
 
-      const paymentsRes = await retryFetch(`${baseUrl}/payments`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          begin_time: beginTime,
-          end_time: endTime,
-          limit: 100
-        })
+      // Get all locations for this org
+      const locations = await base44.asServiceRole.entities.Location.filter({
+        organization_id: connection.organization_id
       });
 
-      if (paymentsRes.ok) {
-        const paymentsData = await paymentsRes.json();
-        const payments = paymentsData.payments || [];
+      for (const location of locations) {
+        let cursor = null;
+        let hasMore = true;
 
-        for (const payment of payments) {
-          try {
-            const tipAmount = payment.tip_money?.amount || 0;
-            if (tipAmount === 0) continue;
+        while (hasMore) {
+          const requestBody = {
+            location_id: location.square_location_id,
+            begin_time: beginTime,
+            end_time: endTime,
+            limit: 100,
+            ...(cursor && { cursor })
+          };
 
-            const existing = await base44.asServiceRole.entities.Payment.filter({
-              organization_id: connection.organization_id,
-              square_payment_id: payment.id
-            });
+          const paymentsRes = await retryFetch(`${baseUrl}/payments`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody)
+          });
 
-            const paymentData = {
-              organization_id: connection.organization_id,
-              square_payment_id: payment.id,
-              square_location_id: payment.location_id,
-              amount_money: payment.amount_money?.amount || 0,
-              tip_money: tipAmount,
-              currency: payment.amount_money?.currency || 'GBP',
-              status: payment.status,
-              created_at: payment.created_at,
-              updated_at: payment.updated_at
-            };
-
-            if (existing.length > 0) {
-              await base44.asServiceRole.entities.Payment.update(existing[0].id, paymentData);
-              entityCounts.payments.updated++;
-              totalUpdated++;
-            } else {
-              await base44.asServiceRole.entities.Payment.create(paymentData);
-              entityCounts.payments.created++;
-              totalCreated++;
-            }
-          } catch (err) {
-            console.error('Payment sync error:', err);
-            errors.push({
-              entity_type: 'payments',
-              square_id: payment.id,
-              error_message: err.message
-            });
-            entityCounts.payments.skipped++;
-            totalSkipped++;
+          if (!paymentsRes.ok) {
+            throw new Error(`Failed to fetch payments for location ${location.name}: ${paymentsRes.statusText}`);
           }
+
+          const paymentsData = await paymentsRes.json();
+          const payments = paymentsData.payments || [];
+
+          for (const payment of payments) {
+            try {
+              // Only process COMPLETED payments
+              if (payment.status !== 'COMPLETED') continue;
+
+              const grossAmount = payment.amount_money?.amount || 0;
+              const tipAmount = payment.tip_money?.amount || 0;
+              const totalAmount = payment.total_money?.amount || (grossAmount + tipAmount);
+              const processingFee = payment.processing_fee?.find(f => f.type === 'PROCESSING_FEE')?.amount_money?.amount || 0;
+              const netAmount = totalAmount - processingFee;
+
+              // Determine source
+              let source = 'pos';
+              if (payment.source_type === 'CARD' && payment.card_details?.entry_method === 'ON_FILE') {
+                source = 'online';
+              } else if (payment.source_type === 'WALLET') {
+                source = 'wallet_pass';
+              } else if (payment.source_type === 'TERMINAL') {
+                source = 'terminal';
+              }
+
+              // Store in SquarePaymentSummary
+              const existing = await base44.asServiceRole.entities.SquarePaymentSummary.filter({
+                organization_id: connection.organization_id,
+                square_payment_id: payment.id
+              });
+
+              const summaryData = {
+                organization_id: connection.organization_id,
+                location_id: location.id,
+                square_payment_id: payment.id,
+                square_order_id: payment.order_id || null,
+                payment_created_at: payment.created_at,
+                gross_amount_pence: grossAmount,
+                tip_amount_pence: tipAmount,
+                total_amount_pence: totalAmount,
+                processing_fee_pence: processingFee,
+                net_amount_pence: netAmount,
+                team_member_id: payment.team_member_id || null,
+                card_brand: payment.card_details?.card?.card_brand || null,
+                source,
+                synced_at: new Date().toISOString()
+              };
+
+              if (existing.length > 0) {
+                await base44.asServiceRole.entities.SquarePaymentSummary.update(existing[0].id, summaryData);
+                entityCounts.payments.updated++;
+                totalUpdated++;
+              } else {
+                await base44.asServiceRole.entities.SquarePaymentSummary.create(summaryData);
+                entityCounts.payments.created++;
+                totalCreated++;
+              }
+
+              // Also sync to legacy Payment table if tip exists
+              if (tipAmount > 0) {
+                const legacyExisting = await base44.asServiceRole.entities.Payment.filter({
+                  organization_id: connection.organization_id,
+                  square_payment_id: payment.id
+                });
+
+                const paymentData = {
+                  organization_id: connection.organization_id,
+                  square_payment_id: payment.id,
+                  square_location_id: location.square_location_id,
+                  location_id: location.id,
+                  square_team_member_id: payment.team_member_id,
+                  payment_date: payment.created_at,
+                  total_amount: totalAmount,
+                  tip_amount: tipAmount,
+                  currency: payment.amount_money?.currency || 'GBP',
+                  payment_source_type: payment.source_type || 'CARD',
+                  card_brand: payment.card_details?.card?.card_brand || null,
+                  status: 'completed'
+                };
+
+                if (legacyExisting.length > 0) {
+                  await base44.asServiceRole.entities.Payment.update(legacyExisting[0].id, paymentData);
+                } else {
+                  await base44.asServiceRole.entities.Payment.create(paymentData);
+                }
+              }
+
+            } catch (err) {
+              console.error('Payment sync error:', err);
+              errors.push({
+                entity_type: 'payments',
+                square_id: payment.id,
+                error_message: err.message
+              });
+              entityCounts.payments.skipped++;
+              totalSkipped++;
+            }
+          }
+
+          cursor = paymentsData.cursor;
+          hasMore = !!cursor;
         }
-        console.log(`Payments synced: ${entityCounts.payments.created} created, ${entityCounts.payments.updated} updated`);
       }
+
+      console.log(`Payments synced: ${entityCounts.payments.created} created, ${entityCounts.payments.updated} updated`);
     } catch (err) {
       console.error('Failed to sync payments:', err);
       errors.push({
         entity_type: 'payments',
+        error_message: err.message
+      });
+    }
+
+    // 4. Generate Daily Revenue Summaries
+    try {
+      console.log('[4/4] Computing daily revenue summaries...');
+      
+      const locations = await base44.asServiceRole.entities.Location.filter({
+        organization_id: connection.organization_id
+      });
+
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      
+      for (const location of locations) {
+        // Get all payment summaries for this location in the sync period
+        const payments = await base44.asServiceRole.entities.SquarePaymentSummary.filter({
+          organization_id: connection.organization_id,
+          location_id: location.id
+        });
+
+        // Group by business date
+        const dailyData = {};
+        
+        for (const payment of payments) {
+          const paymentDate = new Date(payment.payment_created_at);
+          if (paymentDate < sevenDaysAgo) continue;
+          
+          const businessDate = paymentDate.toISOString().split('T')[0];
+          
+          if (!dailyData[businessDate]) {
+            dailyData[businessDate] = {
+              gross: 0,
+              tips: 0,
+              net: 0,
+              count: 0
+            };
+          }
+          
+          dailyData[businessDate].gross += payment.gross_amount_pence;
+          dailyData[businessDate].tips += payment.tip_amount_pence;
+          dailyData[businessDate].net += payment.net_amount_pence;
+          dailyData[businessDate].count += 1;
+        }
+
+        // Upsert daily summaries
+        for (const [businessDate, data] of Object.entries(dailyData)) {
+          const avgTipPercent = data.gross > 0 
+            ? Math.round((data.tips / data.gross) * 100 * 100) / 100 
+            : 0;
+
+          const existing = await base44.asServiceRole.entities.DailyRevenueSummary.filter({
+            organization_id: connection.organization_id,
+            location_id: location.id,
+            business_date: businessDate
+          });
+
+          const summaryData = {
+            organization_id: connection.organization_id,
+            location_id: location.id,
+            business_date: businessDate,
+            total_gross_revenue_pence: data.gross,
+            total_tip_pence: data.tips,
+            total_net_revenue_pence: data.net,
+            avg_tip_percent: avgTipPercent,
+            transaction_count: data.count
+          };
+
+          if (existing.length > 0) {
+            await base44.asServiceRole.entities.DailyRevenueSummary.update(existing[0].id, summaryData);
+          } else {
+            await base44.asServiceRole.entities.DailyRevenueSummary.create(summaryData);
+          }
+        }
+      }
+
+      console.log('Daily revenue summaries computed');
+    } catch (err) {
+      console.error('Failed to compute daily summaries:', err);
+      errors.push({
+        entity_type: 'daily_summaries',
         error_message: err.message
       });
     }
