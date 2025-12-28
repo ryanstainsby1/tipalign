@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { base44 } from '@/api/base44Client';
+import AppLogo from '@/components/common/AppLogo';
 
 const navigation = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
@@ -66,13 +67,7 @@ export default function Layout({ children, currentPageName }) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100">
-            <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
-              <img 
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
-                alt="Tiply Logo" 
-                className="h-8 w-auto"
-              />
-            </Link>
+            <AppLogo size="default" />
             <button 
               className="lg:hidden p-1 text-slate-400 hover:text-slate-600"
               onClick={() => setSidebarOpen(false)}
@@ -182,13 +177,7 @@ export default function Layout({ children, currentPageName }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
-              <img 
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
-                alt="Tiply Logo" 
-                className="h-7 w-auto"
-              />
-            </Link>
+            <AppLogo size="compact" />
             <div className="w-10" /> {/* Spacer for centering */}
           </div>
         </header>
