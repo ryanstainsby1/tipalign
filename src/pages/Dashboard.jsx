@@ -11,16 +11,14 @@ import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { logError } from '@/components/common/ErrorLogger';
 
-import MetricCard from '@/components/dashboard/MetricCard';
-import TipTrendChart from '@/components/dashboard/TipTrendChart';
-import AllocationBreakdown from '@/components/dashboard/AllocationBreakdown';
+import MetricCardPro from '@/components/dashboard/MetricCardPro';
+import ComplianceStatusCard from '@/components/dashboard/ComplianceStatusCard';
+import EmptyTransactions from '@/components/dashboard/EmptyTransactions';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
-import ComplianceStatus from '@/components/dashboard/ComplianceStatus';
 import PayrollExportModal from '@/components/exports/PayrollExportModal';
 import SyncHistory from '@/components/dashboard/SyncHistory';
 import AchievementBadge from '@/components/dashboard/AchievementBadge';
 import ProgressRing from '@/components/dashboard/ProgressRing';
-import LiveMetric from '@/components/dashboard/LiveMetric';
 
 export default function Dashboard() {
   const [showExportModal, setShowExportModal] = useState(false);
@@ -269,24 +267,21 @@ export default function Dashboard() {
     return `£${(value / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
   };
 
-  // Calculate setup progress
-  const setupSteps = [
-    { complete: !!squareConnection, weight: 30 },
-    { complete: locations.length > 0, weight: 25 },
-    { complete: employees.length > 0, weight: 25 },
-    { complete: transactions.length > 0, weight: 20 }
-  ];
-  const setupProgress = setupSteps.reduce((acc, step) => acc + (step.complete ? step.weight : 0), 0);
+  // Calculate audit progress
+  const auditProgress = allocations.length > 0 ? 100 : 0;
+  const hmrcReady = allocations.length > 0 && locations.length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Header */}
         <div className="mb-10">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Dashboard</h1>
-              <p className="text-slate-600">Your tip management command center</p>
+              <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">
+                Your Tip Management Command Center
+              </h1>
+              <p className="text-slate-600 text-lg">Real-time insights into allocations, compliance, and payroll</p>
             </div>
             <div className="flex items-center gap-3">
               {squareConnection && (
@@ -311,19 +306,6 @@ export default function Dashboard() {
               </Button>
             </div>
           </div>
-          
-          {/* Achievements */}
-          {setupProgress < 100 && (
-            <div className="flex items-center justify-center gap-8 p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
-              <ProgressRing progress={setupProgress} size={90} strokeWidth={7} />
-              <div className="flex items-center gap-4">
-                <AchievementBadge type="first_sync" unlocked={!!squareConnection} />
-                <AchievementBadge type="team_ready" unlocked={employees.length >= 3} />
-                <AchievementBadge type="allocation_master" unlocked={allocations.length >= 10} />
-                <AchievementBadge type="compliance_pro" unlocked={transactions.length >= 20} />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Connection Status Alert */}
@@ -526,72 +508,68 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Metrics Grid */}
+        {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <LiveMetric
+          <MetricCardPro
             title="Total Tips This Month"
             value={formatCurrency(totalTips)}
-            change="+12.5%"
-            isPositive={true}
+            trend={totalTips > 0 ? "+12.5% vs last period" : null}
+            trendColor="emerald"
             icon={PoundSterling}
-            color="indigo"
+            bgColor="indigo"
           />
-          <LiveMetric
-            title="Active Team Members"
+          <MetricCardPro
+            title="Across all locations"
             value={employees.length}
-            change={employees.length > 0 ? `+${Math.min(3, employees.length)}` : null}
-            isPositive={true}
+            trend={employees.length > 0 ? `+${Math.min(3, employees.length)} new this month` : "No team members"}
+            trendColor={employees.length > 0 ? "gray" : "gray"}
             icon={Users}
-            color="emerald"
+            bgColor="emerald"
           />
-          <LiveMetric
-            title="Connected Locations"
+          <MetricCardPro
+            title="Connected to Square"
             value={locations.length}
+            trend="All synced"
+            trendColor="emerald"
             icon={MapPin}
-            color="amber"
+            bgColor="amber"
           />
-          <LiveMetric
-            title="Pending Allocations"
+          <MetricCardPro
+            title="Allocations awaiting confirmation"
             value={pendingAllocations}
-            change={pendingAllocations > 0 ? `${pendingAllocations} waiting` : 'All clear'}
-            isPositive={pendingAllocations === 0}
+            trend={pendingAllocations === 0 ? "All clear" : `${pendingAllocations} waiting`}
+            trendColor={pendingAllocations === 0 ? "emerald" : "gray"}
             icon={FileCheck}
-            color={pendingAllocations > 0 ? "rose" : "sky"}
+            bgColor="blue"
           />
         </div>
 
-        {/* Charts Row */}
-        {(transactions.length > 0 || allocations.length > 0) && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2">
-              <TipTrendChart data={last14Days} title="Tips Over Last 14 Days" />
-            </div>
-            <AllocationBreakdown 
-              data={breakdownData.length > 0 ? breakdownData : [{ name: 'No data', value: 1 }]} 
-              title="Tips by Role" 
-            />
-          </div>
-        )}
+        {/* Compliance Status */}
+        <div className="mb-10">
+          <ComplianceStatusCard
+            hmrcReady={hmrcReady}
+            auditProgress={auditProgress}
+            pendingAllocations={pendingAllocations}
+            lastExport={null}
+            onExport={() => setShowExportModal(true)}
+          />
+        </div>
 
-        {/* Bottom Row */}
-        {(transactions.length > 0 || squareConnection) && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+        {/* Recent Transactions & Sync History */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            {transactions.length > 0 ? (
               <RecentTransactions transactions={transactions} />
-            </div>
-            <div className="space-y-6">
-              {squareConnection && recentSyncJobs.length > 0 && (
-                <SyncHistory syncJobs={recentSyncJobs} />
-              )}
-              <ComplianceStatus
-                hmrcReady={transactions.length > 0}
-                lastExport={transactions.length > 0 ? "Not yet exported" : "No data"}
-                pendingAllocations={pendingAllocations}
-                auditScore={transactions.length > 0 ? 98 : 0}
-              />
-            </div>
+            ) : (
+              <EmptyTransactions />
+            )}
           </div>
-        )}
+          <div>
+            {squareConnection && recentSyncJobs.length > 0 && (
+              <SyncHistory syncJobs={recentSyncJobs} />
+            )}
+          </div>
+        </div>
       </div>
 
       <PayrollExportModal
