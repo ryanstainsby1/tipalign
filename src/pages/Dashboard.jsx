@@ -18,6 +18,9 @@ import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import ComplianceStatus from '@/components/dashboard/ComplianceStatus';
 import PayrollExportModal from '@/components/exports/PayrollExportModal';
 import SyncHistory from '@/components/dashboard/SyncHistory';
+import AchievementBadge from '@/components/dashboard/AchievementBadge';
+import ProgressRing from '@/components/dashboard/ProgressRing';
+import LiveMetric from '@/components/dashboard/LiveMetric';
 
 export default function Dashboard() {
   const [showExportModal, setShowExportModal] = useState(false);
@@ -266,14 +269,36 @@ export default function Dashboard() {
     return `£${(value / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
   };
 
+  // Calculate setup progress
+  const setupSteps = [
+    { complete: !!squareConnection, weight: 30 },
+    { complete: locations.length > 0, weight: 25 },
+    { complete: employees.length > 0, weight: 25 },
+    { complete: transactions.length > 0, weight: 20 }
+  ];
+  const setupProgress = setupSteps.reduce((acc, step) => acc + (step.complete ? step.weight : 0), 0);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
-            <p className="text-slate-500 mt-1">Your tip management overview</p>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-8">
+          <div className="flex-1">
+            <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Dashboard</h1>
+            <p className="text-slate-500">Your tip management command center</p>
+            
+            {/* Achievements */}
+            {setupProgress < 100 && (
+              <div className="mt-6 flex items-center gap-4">
+                <ProgressRing progress={setupProgress} size={80} strokeWidth={6} />
+                <div className="flex gap-3">
+                  <AchievementBadge type="first_sync" unlocked={!!squareConnection} />
+                  <AchievementBadge type="team_ready" unlocked={employees.length >= 3} />
+                  <AchievementBadge type="allocation_master" unlocked={allocations.length >= 10} />
+                  <AchievementBadge type="compliance_pro" unlocked={transactions.length >= 20} />
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {squareConnection && (
@@ -500,36 +525,36 @@ export default function Dashboard() {
         )}
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <MetricCard
-            title="Total Tips"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <LiveMetric
+            title="Total Tips This Month"
             value={formatCurrency(totalTips)}
-            subtitle="This month"
-            trend="+12.5%"
-            trendDirection="up"
+            change="+12.5%"
+            isPositive={true}
             icon={PoundSterling}
-            accentColor="indigo"
+            color="indigo"
           />
-          <MetricCard
-            title="Active Employees"
+          <LiveMetric
+            title="Active Team Members"
             value={employees.length}
-            subtitle="Across all locations"
+            change={employees.length > 0 ? `+${Math.min(3, employees.length)}` : null}
+            isPositive={true}
             icon={Users}
-            accentColor="emerald"
+            color="emerald"
           />
-          <MetricCard
-            title="Locations"
+          <LiveMetric
+            title="Connected Locations"
             value={locations.length}
-            subtitle="Connected to Square"
             icon={MapPin}
-            accentColor="amber"
+            color="amber"
           />
-          <MetricCard
-            title="Pending Review"
+          <LiveMetric
+            title="Pending Allocations"
             value={pendingAllocations}
-            subtitle="Allocations awaiting confirmation"
+            change={pendingAllocations > 0 ? `${pendingAllocations} waiting` : 'All clear'}
+            isPositive={pendingAllocations === 0}
             icon={FileCheck}
-            accentColor={pendingAllocations > 0 ? "rose" : "sky"}
+            color={pendingAllocations > 0 ? "rose" : "sky"}
           />
         </div>
 
