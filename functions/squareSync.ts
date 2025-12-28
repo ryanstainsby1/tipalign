@@ -403,13 +403,18 @@ Deno.serve(async (req) => {
       });
 
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      let summariesCreated = 0;
+      let summariesUpdated = 0;
       
       for (const location of locations) {
-        // Get all payment summaries for this location in the sync period
-        const payments = await base44.asServiceRole.entities.SquarePaymentSummary.filter({
-          organization_id: connection.organization_id,
-          location_id: location.id
-        });
+        // Get all payment summaries for this location
+        const allPayments = await base44.asServiceRole.entities.SquarePaymentSummary.list('-payment_created_at', 1000);
+        const payments = allPayments.filter(p => 
+          p.organization_id === connection.organization_id && 
+          p.location_id === location.id
+        );
+
+        console.log(`Processing ${payments.length} payments for location ${location.name}`);
 
         // Group by business date
         const dailyData = {};
@@ -434,6 +439,8 @@ Deno.serve(async (req) => {
           dailyData[businessDate].net += payment.net_amount_pence;
           dailyData[businessDate].count += 1;
         }
+
+        console.log(`Computed ${Object.keys(dailyData).length} daily summaries for ${location.name}`);
 
         // Upsert daily summaries
         for (const [businessDate, data] of Object.entries(dailyData)) {
@@ -460,13 +467,15 @@ Deno.serve(async (req) => {
 
           if (existing.length > 0) {
             await base44.asServiceRole.entities.DailyRevenueSummary.update(existing[0].id, summaryData);
+            summariesUpdated++;
           } else {
             await base44.asServiceRole.entities.DailyRevenueSummary.create(summaryData);
+            summariesCreated++;
           }
         }
       }
 
-      console.log('Daily revenue summaries computed');
+      console.log(`Daily revenue summaries: ${summariesCreated} created, ${summariesUpdated} updated`);
     } catch (err) {
       console.error('Failed to compute daily summaries:', err);
       errors.push({

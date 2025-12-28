@@ -125,7 +125,7 @@ export default function Dashboard() {
     }
   });
 
-  const { data: dailySummaries = [] } = useQuery({
+  const { data: dailySummaries = [], isLoading: loadingSummaries } = useQuery({
     queryKey: ['dailySummaries', dateRange],
     queryFn: async () => {
       const user = await base44.auth.me();
@@ -133,15 +133,14 @@ export default function Dashboard() {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - dateRange);
       
-      const summaries = await base44.entities.DailyRevenueSummary.filter({
-        organization_id: user.organization_id || user.id
-      });
+      const summaries = await base44.entities.DailyRevenueSummary.list('-business_date', 500);
       
       return summaries.filter(s => {
         const date = new Date(s.business_date);
         return date >= startDate && date <= endDate;
       }).sort((a, b) => new Date(a.business_date) - new Date(b.business_date));
     },
+    enabled: !!squareConnection,
   });
 
   const { data: webhookLogs = [] } = useQuery({
@@ -598,7 +597,7 @@ export default function Dashboard() {
         </div>
 
         {/* Revenue vs Tips Chart */}
-        {dailySummaries.length > 0 && (
+        {squareConnection && (
           <div className="mb-10">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-slate-900">Revenue Insights</h2>
@@ -615,12 +614,43 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
-            <RevenueVsTipsChart data={dailySummaries} />
+            {loadingSummaries ? (
+              <Card className="border-0 shadow-lg">
+                <CardContent className="py-20 text-center">
+                  <div className="animate-pulse">
+                    <div className="w-16 h-16 bg-slate-200 rounded-2xl mx-auto mb-4"></div>
+                    <div className="h-4 bg-slate-200 rounded w-48 mx-auto"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : dailySummaries.length === 0 ? (
+              <Card className="border-0 shadow-lg">
+                <CardContent className="py-20 text-center">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <PoundSterling className="w-8 h-8 text-indigo-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No revenue data yet</h3>
+                  <p className="text-slate-600 mb-6">
+                    Run a sync to import payment and revenue data from Square
+                  </p>
+                  <Button
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                    {syncMutation.isPending ? 'Syncing...' : 'Sync Square Data'}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <RevenueVsTipsChart data={dailySummaries} />
+            )}
           </div>
         )}
 
         {/* Location Breakdown */}
-        {locationStats.length > 0 && (
+        {squareConnection && locationStats.length > 0 && (
           <div className="mb-10">
             <LocationBreakdown data={locationStats} />
           </div>
