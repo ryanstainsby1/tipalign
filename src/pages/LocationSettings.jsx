@@ -39,9 +39,13 @@ export default function LocationSettings() {
 
   useEffect(() => {
     if (location) {
+      const addressStr = location.address && typeof location.address === 'object'
+        ? `${location.address.line1 || ''}${location.address.city ? ', ' + location.address.city : ''}`.trim()
+        : location.address || '';
+      
       setFormData({
         name: location.name || '',
-        address: location.address || '',
+        address: addressStr,
         tronc_enabled: location.tronc_enabled || false,
         tronc_master_email: location.tronc_master_email || '',
         payroll_export_format: location.payroll_export_format || 'csv'
