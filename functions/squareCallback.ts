@@ -260,7 +260,61 @@ Deno.serve(async (req) => {
     
     const redirectUrl = `${origin}/Dashboard?${params.toString()}`;
     console.log('Redirecting to:', redirectUrl);
-    return Response.redirect(redirectUrl, 302);
+    
+    // Return HTML with success message and auto-redirect
+    return new Response(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Square Connected</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+            }
+            .container {
+              text-align: center;
+              color: white;
+              padding: 2rem;
+            }
+            .icon {
+              font-size: 4rem;
+              margin-bottom: 1rem;
+              animation: bounce 1s ease-in-out infinite;
+            }
+            h1 { font-size: 2rem; margin: 0 0 0.5rem 0; }
+            p { font-size: 1.1rem; opacity: 0.9; }
+            @keyframes bounce {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-10px); }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="icon">✓</div>
+            <h1>Square Connected Successfully!</h1>
+            <p>Syncing your data... Redirecting to dashboard...</p>
+          </div>
+          <script>
+            setTimeout(() => {
+              window.location.href = ${JSON.stringify(redirectUrl)};
+            }, 1500);
+          </script>
+        </body>
+      </html>
+    `, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' }
+    });
 
   } catch (error) {
     console.error('Square OAuth callback error:', error);
