@@ -1,12 +1,14 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
+  const startTime = Date.now();
+  
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { connection_id, triggered_by = 'manual' } = body;
 
-    console.log('Square sync started:', { connection_id, triggered_by });
+    console.log('=== Square sync started ===', { connection_id, triggered_by, timestamp: new Date().toISOString() });
 
     if (!connection_id) {
       return Response.json({ 
@@ -72,6 +74,36 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json'
     };
 
+    // Retry helper with exponential backoff
+    const retryFetch = async (url, options, maxRetries = 3) => {
+      let lastError;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Attempt ${attempt}/${maxRetries} for ${url}`);
+          const response = await fetch(url, options);
+          
+          // Handle rate limiting
+          if (response.status === 429) {
+            const retryAfter = parseInt(response.headers.get('Retry-After') || '5');
+            console.log(`Rate limited. Waiting ${retryAfter}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+            continue;
+          }
+          
+          return response;
+        } catch (error) {
+          lastError = error;
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          console.error(`Fetch error (attempt ${attempt}):`, error.message);
+          if (attempt < maxRetries) {
+            console.log(`Retrying in ${backoffMs}ms...`);
+            await new Promise(resolve => setTimeout(resolve, backoffMs));
+          }
+        }
+      }
+      throw lastError || new Error('Max retries exceeded');
+    };
+
     let totalCreated = 0;
     let totalUpdated = 0;
     let totalSkipped = 0;
@@ -85,8 +117,8 @@ Deno.serve(async (req) => {
 
     // 1. Sync Locations
     try {
-      console.log('Syncing locations...');
-      const locationsRes = await fetch(`${baseUrl}/locations`, { headers });
+      console.log('[1/3] Syncing locations...');
+      const locationsRes = await retryFetch(`${baseUrl}/locations`, { headers });
       
       if (!locationsRes.ok) {
         throw new Error(`Failed to fetch locations: ${locationsRes.statusText}`);
@@ -151,8 +183,8 @@ Deno.serve(async (req) => {
 
     // 2. Sync Team Members
     try {
-      console.log('Syncing team members...');
-      const teamRes = await fetch(`${baseUrl}/team-members/search`, {
+      console.log('[2/3] Syncing team members...');
+      const teamRes = await retryFetch(`${baseUrl}/team-members/search`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -219,11 +251,11 @@ Deno.serve(async (req) => {
 
     // 3. Sync Payments (last 7 days)
     try {
-      console.log('Syncing payments...');
+      console.log('[3/3] Syncing payments...');
       const beginTime = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const endTime = new Date().toISOString();
 
-      const paymentsRes = await fetch(`${baseUrl}/payments`, {
+      const paymentsRes = await retryFetch(`${baseUrl}/payments`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -304,21 +336,33 @@ Deno.serve(async (req) => {
       last_sync_at: new Date().toISOString()
     });
 
-    console.log('Sync completed:', {
+    const duration = Date.now() - startTime;
+    
+    console.log('=== Sync completed ===', {
       created: totalCreated,
       updated: totalUpdated,
       skipped: totalSkipped,
-      errors: errors.length
+      errors: errors.length,
+      duration_ms: duration
     });
 
+    // Alert if sync took too long
+    if (duration > 5 * 60 * 1000) {
+      console.warn(`⚠️ Sync took ${Math.round(duration / 1000)}s (exceeded 5 minute threshold)`);
+    }
+
     return Response.json({
-      success: true,
+      success: errors.length === 0,
       sync_job_id: syncJob.id,
-      records_created: totalCreated,
-      records_updated: totalUpdated,
-      records_skipped: totalSkipped,
+      records: {
+        created: totalCreated,
+        updated: totalUpdated,
+        skipped: totalSkipped
+      },
       entity_counts: entityCounts,
-      errors: errors.length > 0 ? errors : null
+      errors: errors.length > 0 ? errors : [],
+      duration_ms: duration,
+      performance: duration > 300000 ? 'slow' : duration > 60000 ? 'normal' : 'fast'
     });
 
   } catch (error) {

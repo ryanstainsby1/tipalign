@@ -1,8 +1,10 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
-  console.log('=== CALLBACK FUNCTION INVOKED ===');
+  const callbackStartTime = Date.now();
+  console.log('=== SQUARE OAUTH CALLBACK INVOKED ===');
   console.log('Request URL:', req.url);
+  console.log('Timestamp:', new Date().toISOString());
   
   const url = new URL(req.url);
   const origin = url.origin;
@@ -97,19 +99,36 @@ Deno.serve(async (req) => {
       environment: SQUARE_ENVIRONMENT 
     });
 
-    const tokenResponse = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Square-Version': '2024-12-18'
-      },
-      body: JSON.stringify({
-        client_id: SQUARE_APP_ID,
-        client_secret: SQUARE_APP_SECRET,
-        code: code,
-        grant_type: 'authorization_code'
-      })
-    });
+    // Add 30 second timeout for token exchange
+    const tokenController = new AbortController();
+    const tokenTimeout = setTimeout(() => tokenController.abort(), 30000);
+
+    let tokenResponse;
+    try {
+      tokenResponse = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Square-Version': '2024-12-18'
+        },
+        body: JSON.stringify({
+          client_id: SQUARE_APP_ID,
+          client_secret: SQUARE_APP_SECRET,
+          code: code,
+          grant_type: 'authorization_code'
+        }),
+        signal: tokenController.signal
+      });
+    } catch (fetchError) {
+      clearTimeout(tokenTimeout);
+      if (fetchError.name === 'AbortError') {
+        console.error('Token exchange timeout (30s exceeded)');
+        const redirectUrl = `${origin}/Welcome?error=timeout&details=token_exchange_timeout`;
+        return Response.redirect(redirectUrl, 302);
+      }
+      throw fetchError;
+    }
+    clearTimeout(tokenTimeout);
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
@@ -204,56 +223,48 @@ Deno.serve(async (req) => {
       severity: 'info'
     });
 
-    // Trigger initial sync
-    console.log('Starting initial sync...');
-    let syncSuccess = false;
-    let syncResults = null;
+    // Mark connection as connected even if sync fails
+    console.log('Connection established. Starting async sync in background...');
+    let syncStatus = 'in_progress';
     let locationsCount = 0;
     let staffCount = 0;
     
+    // Trigger sync asynchronously (don't wait for completion)
+    base44.asServiceRole.functions.invoke('squareSync', {
+      connection_id: connection.id,
+      triggered_by: 'initial_setup'
+    }).then(syncResponse => {
+      console.log('Background sync completed:', syncResponse.data);
+    }).catch(syncError => {
+      console.error('Background sync failed (connection still active):', syncError);
+      base44.asServiceRole.entities.SquareConnection.update(connection.id, {
+        last_error: syncError.message,
+        last_error_at: new Date().toISOString()
+      }).catch(err => console.error('Failed to update connection error:', err));
+    });
+    
+    // Quick entity count for immediate feedback
     try {
-      const syncResponse = await base44.asServiceRole.functions.invoke('squareSync', {
-        connection_id: connection.id,
-        triggered_by: 'initial_setup'
-      });
-      syncResults = syncResponse.data;
-      syncSuccess = syncResults.success;
-
-      console.log('Sync results:', syncResults);
-      
-      // Count synced entities
       const locations = await base44.asServiceRole.entities.Location.filter({
         organization_id: stateData.org_id
       });
       const employees = await base44.asServiceRole.entities.Employee.filter({
         organization_id: stateData.org_id
       });
-      
       locationsCount = locations.length;
       staffCount = employees.length;
-      
-    } catch (syncError) {
-      console.error('Initial sync failed:', syncError);
-      await base44.asServiceRole.entities.AppError.create({
-        organization_id: stateData.org_id,
-        user_id: stateData.user_id,
-        page: 'OAuth Callback',
-        action_name: 'initial_sync',
-        error_message: syncError.message,
-        error_stack: syncError.stack,
-        severity: 'warning',
-        metadata: {
-          connection_id: connection.id,
-          merchant_id: merchantId
-        }
-      });
+    } catch (countError) {
+      console.error('Entity count failed:', countError);
     }
 
+    const callbackDuration = Date.now() - callbackStartTime;
+    console.log(`Callback completed in ${callbackDuration}ms`);
+    
     // Redirect to dashboard with success
     const params = new URLSearchParams({
       square_connected: '1',
       merchant: merchantName,
-      sync_status: syncSuccess ? 'success' : 'partial',
+      sync_status: syncStatus,
       locations_synced: locationsCount.toString(),
       staff_synced: staffCount.toString()
     });
