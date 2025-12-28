@@ -11,10 +11,10 @@ export default function AppLogo() {
       alt="Tiply - digital tip management platform"
       onClick={() => navigate(createPageUrl('Dashboard'))}
       style={{
-        width: '120px',
+        width: '180px',
         height: 'auto',
         display: 'block',
-        margin: '16px 0 0 20px',
+        margin: '20px auto',
         cursor: 'pointer'
       }}
     />

@@ -82,7 +82,7 @@ export default function Layout({ children, currentPageName }) {
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div style={{ minHeight: '72px', paddingTop: '16px', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9', position: 'relative' }}>
+          <div style={{ minHeight: '100px', paddingTop: '24px', paddingBottom: '24px', borderBottom: '1px solid #f1f5f9', position: 'relative', background: 'linear-gradient(to bottom, #ffffff, #fafafa)' }}>
             <AppLogo />
             <button 
               className="lg:hidden absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600"
@@ -203,11 +203,11 @@ export default function Layout({ children, currentPageName }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+            <div style={{ height: '50px', display: 'flex', alignItems: 'center' }}>
               <img 
                 src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
                 alt="Tiply – digital tip management"
-                style={{ height: '40px', width: 'auto', maxWidth: '180px', objectFit: 'contain', display: 'block' }}
+                style={{ height: '50px', width: 'auto', maxWidth: '220px', objectFit: 'contain', display: 'block' }}
               />
             </div>
             <div className="w-10" /> {/* Spacer for centering */}
