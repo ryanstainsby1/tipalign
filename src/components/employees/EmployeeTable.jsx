@@ -116,6 +116,10 @@ export default function EmployeeTable({ employees = [], onEdit, onViewHistory })
                       <DropdownMenuItem onClick={() => onViewHistory?.(employee)}>
                         View Tip History
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onViewWallet?.(employee)}>
+                        <Wallet className="w-4 h-4 mr-2" />
+                        Wallet Pass
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
