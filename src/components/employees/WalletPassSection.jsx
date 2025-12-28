@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, QrCode, RefreshCw, Mail } from 'lucide-react';
+import { Wallet, QrCode, RefreshCw, Download } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -32,37 +32,10 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
     }
   };
 
-  const handleEmailPass = async () => {
-    if (!walletPass || !employee.email) {
-      toast.error('Cannot send pass', {
-        description: 'Employee email not configured'
-      });
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const response = await base44.functions.invoke('emailEmployeeWalletPass', {
-        employee_id: employee.id,
-        pass_serial: walletPass.pass_serial_number,
-        pass_auth: walletPass.pass_auth_token
-      });
-
-      if (response.data.success) {
-        toast.success('Wallet pass sent', {
-          description: `Pass emailed to ${employee.email}`
-        });
-      } else {
-        toast.error('Failed to send pass', {
-          description: response.data.error
-        });
-      }
-    } catch (error) {
-      toast.error('Failed to send pass', {
-        description: error.message
-      });
-    } finally {
-      setIsGenerating(false);
+  const handleAddToWallet = () => {
+    if (walletPass) {
+      const pkpassUrl = `${window.location.origin}/functions/employeePassPkpass?employeeId=${employee.id}&serial=${walletPass.pass_serial_number}&auth=${walletPass.pass_auth_token}`;
+      window.location.href = pkpassUrl;
     }
   };
 
@@ -150,12 +123,11 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
             {/* Actions */}
             <div className="flex gap-3">
               <Button 
-                onClick={handleEmailPass}
-                disabled={isGenerating || !employee.email}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleAddToWallet}
+                className="flex-1 bg-black hover:bg-gray-900 text-white"
               >
-                <Mail className="w-4 h-4 mr-2" />
-                Email Pass to Employee
+                <Download className="w-4 h-4 mr-2" />
+                Add to Apple Wallet
               </Button>
               <Button 
                 onClick={handleGeneratePass}
@@ -188,14 +160,18 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
               </div>
             )}
 
-            {/* How It Works */}
+            {/* Setup Instructions */}
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-semibold text-blue-900 mb-2 text-sm">How It Works</h4>
+              <h4 className="font-semibold text-blue-900 mb-2 text-sm">Apple Wallet Setup Required</h4>
               <div className="text-xs text-blue-700 space-y-1">
-                <p>1. Click "Email Pass to Employee" to send the Apple Wallet pass</p>
-                <p>2. Employee opens email on their iPhone</p>
-                <p>3. Tap the pass file to add it to Apple Wallet</p>
-                <p className="mt-2"><strong>Note:</strong> Employee email must be configured</p>
+                <p><strong>Administrator:</strong> Configure these environment variables:</p>
+                <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                  <li>APPLE_WALLET_PASS_TYPE_ID</li>
+                  <li>APPLE_WALLET_TEAM_ID</li>
+                  <li>APPLE_WALLET_CERT_P12_BASE64</li>
+                  <li>APPLE_WALLET_CERT_PASSWORD</li>
+                </ul>
+                <p className="mt-2">Get certificates from Apple Developer Portal → Identifiers → Pass Type IDs</p>
               </div>
             </div>
           </div>
