@@ -66,10 +66,10 @@ export default function Layout({ children, currentPageName }) {
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-20 px-6 border-b border-slate-100">
-            <AppLogo size="default" />
+          <div style={{ minHeight: '72px', paddingTop: '16px', paddingBottom: '16px', borderBottom: '1px solid #f1f5f9', position: 'relative' }}>
+            <AppLogo />
             <button 
-              className="lg:hidden p-1 text-slate-400 hover:text-slate-600"
+              className="lg:hidden absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
@@ -177,7 +177,13 @@ export default function Layout({ children, currentPageName }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <AppLogo size="compact" />
+            <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+              <img 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
+                alt="Tiply – digital tip management"
+                style={{ height: '40px', width: 'auto', maxWidth: '180px', objectFit: 'contain', display: 'block' }}
+              />
+            </div>
             <div className="w-10" /> {/* Spacer for centering */}
           </div>
         </header>
