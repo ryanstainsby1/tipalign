@@ -6,34 +6,50 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Settings as SettingsIcon, 
   Building2, 
   Shield, 
   Bell, 
-  Link2,
-  CheckCircle,
-  ExternalLink,
-  RefreshCw,
-  Loader2
+  Users,
+  Key,
+  Copy,
+  Plus,
+  MoreVertical,
+  Upload,
+  Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
-import AllocationRuleBuilder from '@/components/allocation/AllocationRuleBuilder';
-import SyncScheduleConfig from '@/components/sync/SyncScheduleConfig';
+import { format } from 'date-fns';
+import AddUserModal from '@/components/settings/AddUserModal';
+import CreateAPIKeyModal from '@/components/settings/CreateAPIKeyModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeSection, setActiveSection] = useState('profile');
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [showCreateKey, setShowCreateKey] = useState(false);
+  const [roleDefinitionsOpen, setRoleDefinitionsOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
-    queryFn: () => base44.entities.Location.list(),
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
   });
 
-  const { data: squareConnections = [], isLoading: loadingConnection } = useQuery({
+  const { data: squareConnections = [] } = useQuery({
     queryKey: ['squareConnection'],
     queryFn: async () => {
       const user = await base44.auth.me();
@@ -45,384 +61,451 @@ export default function Settings() {
 
   const squareConnection = squareConnections.find(c => c.connection_status === 'connected');
 
-  const connectMutation = useMutation({
-    mutationFn: async () => {
-      const response = await base44.functions.invoke('squareOAuthStart', {});
-      return response.data;
-    },
-    onSuccess: (data) => {
-      if (data.redirect_url) {
-        window.location.href = data.redirect_url;
-      }
-    },
-    onError: (error) => {
-      toast.error('Connection failed: ' + error.message);
-    }
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations'],
+    queryFn: () => base44.entities.Location.list(),
   });
 
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      if (!squareConnection) throw new Error('No Square connection found');
-      const response = await base44.functions.invoke('squareSync', {
-        connection_id: squareConnection.id,
-        triggered_by: 'manual'
-      });
-      return response.data;
+  const menuItems = [
+    { id: 'profile', label: 'Organization Profile', icon: Building2 },
+    { id: 'users', label: 'Users & Permissions', icon: Users },
+    { id: 'api', label: 'API Credentials', icon: Key },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+  ];
+
+  const mockUsers = [
+    { name: 'Admin User', email: 'admin@demo.com', role: 'Admin', lastActive: '2025-12-28', id: 1 },
+    { name: 'John Manager', email: 'john@demo.com', role: 'Manager', lastActive: '2025-12-27', id: 2 },
+    { name: 'Sarah Staff', email: 'sarah@demo.com', role: 'Staff', lastActive: '2025-12-26', id: 3 },
+  ];
+
+  const mockAPIKeys = [
+    { 
+      name: 'Production API Key', 
+      key: 'sk_live_abc123...xyz789',
+      created: '2025-12-01',
+      lastUsed: '2025-12-28',
+      id: 1 
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
-      toast.success('Sync complete!');
-    },
-    onError: (error) => {
-      toast.error('Sync failed: ' + error.message);
-    }
+  ];
+
+  const [notifications, setNotifications] = useState({
+    dailySummary: true,
+    allocationDisputes: true,
+    hmrcAlerts: true,
+    failedSyncs: true,
+    payrollExports: true
   });
 
-  const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      if (!squareConnection) throw new Error('No connection');
-      const response = await base44.functions.invoke('squareDisconnect', {
-        connection_id: squareConnection.id,
-        preserve_data: true
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
-      toast.success('Square disconnected successfully');
-    },
-    onError: (error) => {
-      toast.error('Disconnect failed: ' + error.message);
-    }
-  });
+  const handleAddUser = (userData) => {
+    toast.success('User invited successfully', {
+      description: `Invitation sent to ${userData.email}`
+    });
+  };
 
-  const [selectedLocation, setSelectedLocation] = useState(null);
+  const handleGenerateAPIKey = (keyData) => {
+    toast.success('API key created successfully');
+  };
+
+  const handleCopyKey = (key) => {
+    navigator.clipboard.writeText(key);
+    toast.success('API key copied to clipboard');
+  };
+
+  const handleSaveProfile = () => {
+    toast.success('Profile updated successfully');
+  };
+
+  const handleToggleNotification = (key) => {
+    setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+    toast.success('Notification preferences updated');
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Settings</h1>
-          <p className="text-slate-500 mt-1">Configure your tip management platform</p>
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">
+            Settings
+          </h1>
+          <p className="text-slate-600 text-lg">Manage your organization and platform preferences</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-white border border-slate-200 p-1">
-            <TabsTrigger value="general" className="gap-2">
-              <SettingsIcon className="w-4 h-4" />
-              General
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2">
-              <Link2 className="w-4 h-4" />
-              Integrations
-            </TabsTrigger>
-            <TabsTrigger value="allocation" className="gap-2">
-              <Building2 className="w-4 h-4" />
-              Allocation Rules
-            </TabsTrigger>
-            <TabsTrigger value="compliance" className="gap-2">
-              <Shield className="w-4 h-4" />
-              Compliance
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex gap-8">
+          {/* Sidebar */}
+          <aside className="w-64 flex-shrink-0">
+            <nav className="space-y-1 sticky top-8">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left
+                      transition-all duration-150
+                      ${activeSection === item.id
+                        ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }
+                    `}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
 
-          {/* General Settings */}
-          <TabsContent value="general" className="space-y-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Business Information</CardTitle>
-                <CardDescription>Your organization details for HMRC reporting</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Business Name</Label>
-                    <Input defaultValue="Demo Restaurant Group" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>PAYE Reference</Label>
-                    <Input placeholder="123/AB45678" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Accounts Office Reference</Label>
-                    <Input placeholder="123PA00012345" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Primary Contact Email</Label>
-                    <Input type="email" defaultValue="finance@demo.com" />
-                  </div>
-                </div>
-                <div className="pt-4">
-                  <Button className="bg-indigo-600 hover:bg-indigo-700">Save Changes</Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Notifications</CardTitle>
-                <CardDescription>Configure alerts and reminders</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[
-                  { label: "Daily tip summary email", enabled: true },
-                  { label: "Pending allocation reminders", enabled: true },
-                  { label: "Payroll export due alerts", enabled: true },
-                  { label: "Compliance check notifications", enabled: false },
-                  { label: "Employee dispute alerts", enabled: true }
-                ].map((notification, i) => (
-                  <div key={i} className="flex items-center justify-between py-2">
-                    <span className="text-sm font-medium text-slate-700">{notification.label}</span>
-                    <Switch defaultChecked={notification.enabled} />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Integrations */}
-          <TabsContent value="integrations" className="space-y-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Square Integration
-                  {squareConnection && (
-                    <Badge className="bg-emerald-100 text-emerald-700">Connected</Badge>
-                  )}
-                </CardTitle>
-                <CardDescription>Sync transactions, employees, and locations from Square</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SyncScheduleConfig squareConnection={squareConnection} />
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Manual Sync</CardTitle>
-                <CardDescription>Sync Square data on-demand</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingConnection ? (
-                  <div className="animate-pulse space-y-4">
-                    <div className="h-16 bg-slate-200 rounded-xl"></div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="h-20 bg-slate-200 rounded-lg"></div>
-                      <div className="h-20 bg-slate-200 rounded-lg"></div>
-                      <div className="h-20 bg-slate-200 rounded-lg"></div>
+          {/* Main Content */}
+          <main className="flex-1">
+            {/* Organization Profile */}
+            {activeSection === 'profile' && (
+              <div className="space-y-6">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Organization Profile</CardTitle>
+                    <CardDescription>Your business information and branding</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <Label>Merchant Name</Label>
+                      <Input 
+                        defaultValue={squareConnection?.merchant_business_name || 'Demo Restaurant'}
+                        disabled
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Auto-filled from Square</p>
                     </div>
-                  </div>
-                ) : squareConnection ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        <div>
-                          <p className="font-medium text-emerald-900">Connected to Square</p>
-                          <p className="text-sm text-emerald-700">Merchant: {squareConnection.merchant_business_name}</p>
+
+                    <div>
+                      <Label>Business Address</Label>
+                      <Input 
+                        defaultValue="123 High Street, London, UK"
+                        disabled
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Auto-filled from Square</p>
+                    </div>
+
+                    <div>
+                      <Label>Locations Managed</Label>
+                      <Input 
+                        defaultValue={`${locations.length} locations`}
+                        disabled
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Auto-filled from Square</p>
+                    </div>
+
+                    <div>
+                      <Label>Company Logo</Label>
+                      <div className="mt-2 flex items-center gap-4">
+                        <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center">
+                          <Building2 className="w-10 h-10 text-slate-400" />
                         </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => syncMutation.mutate()}
-                        disabled={syncMutation.isPending}
-                        className="border-emerald-300"
-                      >
-                        <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                        {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
-                      </Button>
-                    </div>
-                    
-                    <div className="grid md:grid-cols-3 gap-4">
-                      <div className="p-4 rounded-lg bg-slate-50">
-                        <p className="text-2xl font-bold text-slate-900">{locations.length}</p>
-                        <p className="text-sm text-slate-500">Locations connected</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-slate-50">
-                        <p className="text-2xl font-bold text-slate-900">-</p>
-                        <p className="text-sm text-slate-500">Team members synced</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-slate-50">
-                        <p className="text-2xl font-bold text-slate-900">-</p>
-                        <p className="text-sm text-slate-500">Transactions synced</p>
+                        <Button variant="outline">
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload New Logo
+                        </Button>
                       </div>
                     </div>
 
-                    <Button 
-                      variant="outline" 
-                      className="text-rose-600 border-rose-200 hover:bg-rose-50"
-                      onClick={() => disconnectMutation.mutate()}
-                      disabled={disconnectMutation.isPending}
-                    >
-                      {disconnectMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Disconnecting...
-                        </>
-                      ) : (
-                        'Disconnect Square'
-                      )}
+                    <div>
+                      <Label>Timezone</Label>
+                      <Select defaultValue="europe-london">
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="europe-london">Europe/London (GMT)</SelectItem>
+                          <SelectItem value="europe-paris">Europe/Paris (CET)</SelectItem>
+                          <SelectItem value="america-new-york">America/New York (EST)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Button onClick={handleSaveProfile} className="bg-indigo-600 hover:bg-indigo-700">
+                      Save Changes
                     </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    className="bg-slate-900 hover:bg-slate-800"
-                    onClick={() => connectMutation.mutate()}
-                    disabled={connectMutation.isPending}
-                  >
-                    {connectMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="w-4 h-4 mr-2" />
-                        Connect with Square
-                        <ExternalLink className="w-3 h-3 ml-2" />
-                      </>
-                    )}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Payroll Integration</CardTitle>
-                <CardDescription>Connect to your payroll provider for automatic exports</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {[
-                    { name: 'Sage', connected: false },
-                    { name: 'Xero', connected: false },
-                    { name: 'QuickBooks', connected: false },
-                    { name: 'Custom API', connected: false }
-                  ].map(provider => (
-                    <div key={provider.name} className="flex items-center justify-between p-4 rounded-lg border border-slate-200">
-                      <span className="font-medium text-slate-700">{provider.name}</span>
-                      <Button variant="outline" size="sm">
-                        Connect
+            {/* Users & Permissions */}
+            {activeSection === 'users' && (
+              <div className="space-y-6">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Team Access</CardTitle>
+                        <CardDescription>Manage who can access Tiply and what they can do</CardDescription>
+                      </div>
+                      <Button onClick={() => setShowAddUser(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add User
                       </Button>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Last Active</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mockUsers.map(user => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.name}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{user.role}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-600">
+                              {format(new Date(user.lastActive), 'MMM d, yyyy')}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem>Edit</DropdownMenuItem>
+                                  <DropdownMenuItem className="text-rose-600">Remove</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
 
-          {/* Allocation Rules */}
-          <TabsContent value="allocation" className="space-y-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Default Allocation Rules</CardTitle>
-                <CardDescription>Set company-wide defaults (can be overridden per location)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6">
-                  <Label className="text-sm font-medium">Select Location to Configure</Label>
-                  <Select 
-                    value={selectedLocation?.id || 'default'} 
-                    onValueChange={(v) => setSelectedLocation(v === 'default' ? null : locations.find(l => l.id === v))}
-                  >
-                    <SelectTrigger className="mt-2 w-full max-w-xs">
-                      <SelectValue placeholder="Default (All Locations)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="default">Default (All Locations)</SelectItem>
-                      {locations.map(loc => (
-                        <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                <Collapsible open={roleDefinitionsOpen} onOpenChange={setRoleDefinitionsOpen}>
+                  <Card className="border-0 shadow-lg">
+                    <CollapsibleTrigger className="w-full">
+                      <CardHeader>
+                        <CardTitle className="text-left">Role Definitions</CardTitle>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="space-y-4">
+                        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                          <h4 className="font-semibold text-indigo-900 mb-2">Admin</h4>
+                          <p className="text-sm text-indigo-700">
+                            Full access to all features. Can manage users, settings, allocations, and exports.
+                          </p>
+                        </div>
+                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                          <h4 className="font-semibold text-emerald-900 mb-2">Manager</h4>
+                          <p className="text-sm text-emerald-700">
+                            Can view all locations, approve allocations, and export payroll data.
+                          </p>
+                        </div>
+                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                          <h4 className="font-semibold text-amber-900 mb-2">Staff</h4>
+                          <p className="text-sm text-amber-700">
+                            Can only view their own tips through the Employee Portal.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              </div>
+            )}
+
+            {/* API Credentials */}
+            {activeSection === 'api' && (
+              <div className="space-y-6">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>API Keys</CardTitle>
+                        <CardDescription>For advanced integrations with external systems</CardDescription>
+                      </div>
+                      <Button onClick={() => setShowCreateKey(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create New Key
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {mockAPIKeys.map(apiKey => (
+                        <div key={apiKey.id} className="p-5 bg-slate-50 rounded-xl border border-slate-200">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-3">
+                                <h4 className="font-semibold text-slate-900">{apiKey.name}</h4>
+                                <Badge variant="outline" className="bg-emerald-100 text-emerald-700">
+                                  Active
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <code className="text-sm bg-white px-3 py-1.5 rounded border border-slate-200">
+                                  {apiKey.key}
+                                </code>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleCopyKey(apiKey.key)}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-slate-600">Created:</span>
+                                  <span className="ml-2 text-slate-900">
+                                    {format(new Date(apiKey.created), 'MMM d, yyyy')}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-600">Last used:</span>
+                                  <span className="ml-2 text-slate-900">
+                                    {format(new Date(apiKey.lastUsed), 'MMM d, yyyy')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>Regenerate</DropdownMenuItem>
+                                <DropdownMenuItem className="text-rose-600">Revoke</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
 
-            <AllocationRuleBuilder
-              initialPolicy={selectedLocation?.tip_policy || 'individual'}
-              initialWeights={selectedLocation?.role_weights || {}}
-              onSave={(data) => console.log('Save allocation rules:', data)}
-            />
-          </TabsContent>
+                      <div className="p-6 bg-blue-50 rounded-xl border border-blue-200">
+                        <h4 className="font-semibold text-blue-900 mb-2">API Documentation</h4>
+                        <p className="text-sm text-blue-700 mb-3">
+                          Use these keys to integrate Tiply with external systems. Keep your keys secure and never share them publicly.
+                        </p>
+                        <Button variant="outline" className="bg-white">
+                          View API Docs
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-          {/* Compliance Settings */}
-          <TabsContent value="compliance" className="space-y-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>HMRC Configuration</CardTitle>
-                <CardDescription>Settings for UK tax compliance</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Tax Year</Label>
-                  <Select defaultValue="2024-25">
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2024-25">2024-25</SelectItem>
-                      <SelectItem value="2023-24">2023-24</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            {/* Notifications */}
+            {activeSection === 'notifications' && (
+              <div className="space-y-6">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Email Alerts</CardTitle>
+                    <CardDescription>Configure when you receive email notifications</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="flex items-start justify-between py-3 border-b border-slate-200">
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-1">Daily Summary</h4>
+                          <p className="text-sm text-slate-600">
+                            Receive a daily email with tips, allocations, and sync status
+                          </p>
+                        </div>
+                        <Switch 
+                          checked={notifications.dailySummary}
+                          onCheckedChange={() => handleToggleNotification('dailySummary')}
+                        />
+                      </div>
 
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="font-medium text-slate-700">Tronc Scheme</p>
-                    <p className="text-sm text-slate-500">Enable independent tronc master allocation</p>
-                  </div>
-                  <Switch />
-                </div>
+                      <div className="flex items-start justify-between py-3 border-b border-slate-200">
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-1">Allocation Disputes</h4>
+                          <p className="text-sm text-slate-600">
+                            Get notified when an employee files a dispute
+                          </p>
+                        </div>
+                        <Switch 
+                          checked={notifications.allocationDisputes}
+                          onCheckedChange={() => handleToggleNotification('allocationDisputes')}
+                        />
+                      </div>
 
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="font-medium text-slate-700">Automatic PAYE Period Assignment</p>
-                    <p className="text-sm text-slate-500">Assign tax periods to allocations automatically</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
+                      <div className="flex items-start justify-between py-3 border-b border-slate-200">
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-1">HMRC Alerts</h4>
+                          <p className="text-sm text-slate-600">
+                            Important notifications when compliance status changes
+                          </p>
+                        </div>
+                        <Switch 
+                          checked={notifications.hmrcAlerts}
+                          onCheckedChange={() => handleToggleNotification('hmrcAlerts')}
+                        />
+                      </div>
 
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="font-medium text-slate-700">Audit Hash Generation</p>
-                    <p className="text-sm text-slate-500">Generate immutable hashes for all transactions</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
+                      <div className="flex items-start justify-between py-3 border-b border-slate-200">
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-1">Failed Syncs</h4>
+                          <p className="text-sm text-slate-600">
+                            Alert when Square data sync encounters an error
+                          </p>
+                        </div>
+                        <Switch 
+                          checked={notifications.failedSyncs}
+                          onCheckedChange={() => handleToggleNotification('failedSyncs')}
+                        />
+                      </div>
 
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Data Retention</CardTitle>
-                <CardDescription>Configure how long records are stored</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label>Retention Period</Label>
-                  <Select defaultValue="7">
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7">7 years (HMRC required)</SelectItem>
-                      <SelectItem value="10">10 years</SelectItem>
-                      <SelectItem value="indefinite">Indefinite</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-slate-500 mt-1">
-                    HMRC requires employers to keep payroll records for at least 3 years after the tax year they relate to. We recommend 7 years for full compliance.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                      <div className="flex items-start justify-between py-3">
+                        <div>
+                          <h4 className="font-medium text-slate-900 mb-1">Payroll Exports</h4>
+                          <p className="text-sm text-slate-600">
+                            Confirmation emails when payroll exports are completed
+                          </p>
+                        </div>
+                        <Switch 
+                          checked={notifications.payrollExports}
+                          onCheckedChange={() => handleToggleNotification('payrollExports')}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
+
+      <AddUserModal
+        open={showAddUser}
+        onClose={() => setShowAddUser(false)}
+        onAdd={handleAddUser}
+      />
+
+      <CreateAPIKeyModal
+        open={showCreateKey}
+        onClose={() => setShowCreateKey(false)}
+        onGenerate={handleGenerateAPIKey}
+      />
     </div>
   );
 }
