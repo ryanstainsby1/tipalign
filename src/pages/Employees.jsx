@@ -202,11 +202,13 @@ export default function Employees() {
         {/* Wallet Pass Dialog */}
         <Dialog open={!!viewingWallet} onOpenChange={() => setViewingWallet(null)}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <WalletPassSection 
-              employee={viewingWallet}
-              walletPass={walletPasses[0] || null}
-              onRefresh={() => queryClient.invalidateQueries({ queryKey: ['walletPasses'] })}
-            />
+            {viewingWallet && (
+              <WalletPassSection 
+                employee={viewingWallet}
+                walletPass={walletPasses[0] || null}
+                onRefresh={() => queryClient.invalidateQueries({ queryKey: ['walletPasses'] })}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </div>
