@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, QrCode, RefreshCw, ExternalLink } from 'lucide-react';
+import { Wallet, QrCode, RefreshCw, Download } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -32,10 +32,10 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
     }
   };
 
-  const handleOpenPass = () => {
+  const handleAddToWallet = () => {
     if (walletPass) {
-      const passUrl = `${window.location.origin}/functions/employeeWalletPass?serial=${walletPass.pass_serial_number}&auth=${walletPass.pass_auth_token}`;
-      window.open(passUrl, '_blank');
+      const pkpassUrl = `${window.location.origin}/functions/employeePassPkpass?employeeId=${employee.id}&serial=${walletPass.pass_serial_number}&auth=${walletPass.pass_auth_token}`;
+      window.location.href = pkpassUrl;
     }
   };
 
@@ -123,12 +123,11 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
             {/* Actions */}
             <div className="flex gap-3">
               <Button 
-                onClick={handleOpenPass}
-                variant="outline"
-                className="flex-1"
+                onClick={handleAddToWallet}
+                className="flex-1 bg-black hover:bg-gray-900 text-white"
               >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View Pass JSON
+                <Download className="w-4 h-4 mr-2" />
+                Add to Apple Wallet
               </Button>
               <Button 
                 onClick={handleGeneratePass}
@@ -161,12 +160,19 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
               </div>
             )}
 
-            {/* Setup Note */}
-            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-              <p className="text-sm text-amber-800">
-                <strong>Note:</strong> Full Apple Wallet integration requires Apple Developer certificates. 
-                Contact your administrator to complete setup.
-              </p>
+            {/* Setup Instructions */}
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-blue-900 mb-2 text-sm">Apple Wallet Setup Required</h4>
+              <div className="text-xs text-blue-700 space-y-1">
+                <p><strong>Administrator:</strong> Configure these environment variables:</p>
+                <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                  <li>APPLE_WALLET_PASS_TYPE_ID</li>
+                  <li>APPLE_WALLET_TEAM_ID</li>
+                  <li>APPLE_WALLET_CERT_P12_BASE64</li>
+                  <li>APPLE_WALLET_CERT_PASSWORD</li>
+                </ul>
+                <p className="mt-2">Get certificates from Apple Developer Portal → Identifiers → Pass Type IDs</p>
+              </div>
             </div>
           </div>
         )}
