@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, QrCode, RefreshCw, Download } from 'lucide-react';
+import { Wallet, QrCode, RefreshCw, Download, Mail } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -34,8 +34,34 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
 
   const handleAddToWallet = () => {
     if (walletPass) {
-      const pkpassUrl = `${window.location.origin}/functions/employeePassPkpass?employeeId=${employee.id}&serial=${walletPass.pass_serial_number}&auth=${walletPass.pass_auth_token}`;
+      const baseUrl = 'https://tip-align-29fe435b.base44.app';
+      const pkpassUrl = `${baseUrl}/functions/employeePassPkpass?employeeId=${employee.id}&serial=${walletPass.pass_serial_number}&auth=${walletPass.pass_auth_token}`;
       window.location.href = pkpassUrl;
+    }
+  };
+
+  const handleEmailPass = async () => {
+    if (!walletPass) return;
+    
+    setIsGenerating(true);
+    try {
+      const response = await base44.functions.invoke('emailWalletPass', {
+        employee_id: employee.id,
+        pass_serial: walletPass.pass_serial_number,
+        pass_auth_token: walletPass.pass_auth_token
+      });
+
+      if (response.data.success) {
+        toast.success('Pass sent!', {
+          description: `Wallet pass emailed to ${employee.email}`
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to send pass', {
+        description: error.message
+      });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -121,22 +147,33 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3">
-              <Button 
-                onClick={handleAddToWallet}
-                className="flex-1 bg-black hover:bg-gray-900 text-white"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Add to Apple Wallet
-              </Button>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <Button 
+                  onClick={handleAddToWallet}
+                  className="flex-1 bg-black hover:bg-gray-900 text-white"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Pass
+                </Button>
+                <Button 
+                  onClick={handleEmailPass}
+                  disabled={isGenerating || !employee.email}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Email Pass
+                </Button>
+              </div>
               <Button 
                 onClick={handleGeneratePass}
                 disabled={isGenerating}
                 variant="outline"
-                className="flex-1"
+                className="w-full"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                Regenerate
+                Regenerate Pass
               </Button>
             </div>
 
