@@ -2,7 +2,7 @@ import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MoreHorizontal, TrendingUp } from 'lucide-react';
+import { MoreHorizontal, TrendingUp, Wallet } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export default function EmployeeTable({ employees = [], onEdit, onViewHistory }) {
+export default function EmployeeTable({ employees = [], onEdit, onViewHistory, onViewWallet }) {
   const formatCurrency = (value) => {
     return `£${((value || 0) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
   };
