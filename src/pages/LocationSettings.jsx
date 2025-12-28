@@ -118,7 +118,11 @@ export default function LocationSettings() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{location.name}</h1>
-              <p className="text-slate-500">{location.address || 'No address set'}</p>
+              <p className="text-slate-500">
+                {location.address && typeof location.address === 'object'
+                  ? `${location.address.line1 || ''}${location.address.city ? ', ' + location.address.city : ''}`.trim() || 'No address set'
+                  : location.address || 'No address set'}
+              </p>
             </div>
           </div>
         </div>
