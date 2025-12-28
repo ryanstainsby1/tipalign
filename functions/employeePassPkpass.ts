@@ -6,6 +6,7 @@ Deno.serve(async (req) => {
     const employeeId = url.searchParams.get('employeeId');
     const serial = url.searchParams.get('serial');
     const auth = url.searchParams.get('auth');
+    const inviteToken = url.searchParams.get('invite_token');
 
     if (!employeeId || !serial || !auth) {
       return Response.json({ error: 'Missing required parameters' }, { status: 400 });
@@ -194,6 +195,43 @@ Deno.serve(async (req) => {
       }
     });
     */
+
+    // Track installation if invite_token provided
+    if (inviteToken) {
+      const base44 = createClientFromRequest(req);
+      
+      try {
+        const invites = await base44.asServiceRole.entities.EmployeeWalletInvite.filter({
+          invite_token: inviteToken
+        });
+
+        if (invites.length > 0) {
+          await base44.asServiceRole.entities.EmployeeWalletInvite.update(invites[0].id, {
+            status: 'installed',
+            installed_at: new Date().toISOString()
+          });
+
+          // Log installation event
+          await base44.asServiceRole.entities.AuditLog.create({
+            action_type: 'employee_added',
+            entity_type: 'wallet_pass',
+            entity_id: invites[0].id,
+            actor_email: 'system',
+            actor_role: 'system',
+            reason: `Wallet pass installed from invite`,
+            new_value: JSON.stringify({
+              employee_id: employeeId,
+              invite_id: invites[0].id,
+              user_agent: req.headers.get('user-agent')
+            }),
+            hmrc_relevant: false
+          });
+        }
+      } catch (trackError) {
+        console.error('Install tracking error:', trackError);
+        // Continue anyway - tracking is non-critical
+      }
+    }
 
     // Placeholder response until signing is implemented
     return Response.json({

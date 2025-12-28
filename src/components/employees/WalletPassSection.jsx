@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, QrCode, RefreshCw, Download, Mail } from 'lucide-react';
+import { Wallet, QrCode, RefreshCw, Download, Mail, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -40,30 +40,51 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
     }
   };
 
-  const handleEmailPass = async () => {
-    if (!walletPass) return;
-    
+  const handleSendInvite = async () => {
     setIsGenerating(true);
     try {
-      const response = await base44.functions.invoke('emailWalletPass', {
+      const response = await base44.functions.invoke('sendEmployeeWalletInvite', {
         employee_id: employee.id,
-        pass_serial: walletPass.pass_serial_number,
-        pass_auth_token: walletPass.pass_auth_token
+        channel: 'email'
       });
 
       if (response.data.success) {
-        toast.success('Pass sent!', {
-          description: `Wallet pass emailed to ${employee.email}`
+        toast.success('Invite sent!', {
+          description: `Wallet invite emailed to ${employee.email}`
         });
+        loadInvites();
       }
     } catch (error) {
-      toast.error('Failed to send pass', {
+      toast.error('Failed to send invite', {
         description: error.message
       });
     } finally {
       setIsGenerating(false);
     }
   };
+
+  const [invites, setInvites] = useState([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+
+  const loadInvites = async () => {
+    setLoadingInvites(true);
+    try {
+      const allInvites = await base44.entities.EmployeeWalletInvite.filter({
+        employee_id: employee.id
+      });
+      setInvites(allInvites.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at)));
+    } catch (error) {
+      console.error('Failed to load invites:', error);
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
+
+  useEffect(() => {
+    if (walletPass) {
+      loadInvites();
+    }
+  }, [walletPass]);
 
   return (
     <Card className="border-0 shadow-lg">
@@ -148,33 +169,81 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
 
             {/* Actions */}
             <div className="space-y-3">
+              <Button 
+                onClick={handleSendInvite}
+                disabled={isGenerating || !employee.email}
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                Send Wallet Invite
+              </Button>
               <div className="flex gap-3">
                 <Button 
                   onClick={handleAddToWallet}
-                  className="flex-1 bg-black hover:bg-gray-900 text-white"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Pass
-                </Button>
-                <Button 
-                  onClick={handleEmailPass}
-                  disabled={isGenerating || !employee.email}
                   variant="outline"
                   className="flex-1"
                 >
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email Pass
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+                <Button 
+                  onClick={handleGeneratePass}
+                  disabled={isGenerating}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                  Regenerate
                 </Button>
               </div>
-              <Button 
-                onClick={handleGeneratePass}
-                disabled={isGenerating}
-                variant="outline"
-                className="w-full"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                Regenerate Pass
-              </Button>
+            </div>
+
+            {/* Invites Section */}
+            <div className="mt-6 pt-6 border-t border-slate-200">
+              <h4 className="font-semibold text-slate-900 mb-3 text-sm">Invite History</h4>
+              
+              {loadingInvites ? (
+                <p className="text-sm text-slate-500">Loading...</p>
+              ) : invites.length === 0 ? (
+                <p className="text-sm text-slate-500">No wallet invites sent yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {invites.map((invite) => {
+                    const statusConfig = {
+                      pending: { icon: Clock, color: 'text-slate-500', label: 'Pending' },
+                      opened: { icon: Mail, color: 'text-blue-600', label: 'Opened' },
+                      installed: { icon: CheckCircle2, color: 'text-emerald-600', label: 'Installed' },
+                      expired: { icon: XCircle, color: 'text-rose-600', label: 'Expired' },
+                      revoked: { icon: XCircle, color: 'text-rose-600', label: 'Revoked' }
+                    }[invite.status] || { icon: Clock, color: 'text-slate-500', label: invite.status };
+                    
+                    const StatusIcon = statusConfig.icon;
+
+                    return (
+                      <div key={invite.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <StatusIcon className={`w-4 h-4 ${statusConfig.color}`} />
+                            <span className="text-sm font-medium text-slate-900">{statusConfig.label}</span>
+                          </div>
+                          <span className="text-xs text-slate-500">
+                            {new Date(invite.sent_at).toLocaleDateString('en-GB')}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-600 space-y-0.5">
+                          <div>To: {invite.delivery_target}</div>
+                          {invite.opened_at && (
+                            <div>Opened: {new Date(invite.opened_at).toLocaleString('en-GB')}</div>
+                          )}
+                          {invite.installed_at && (
+                            <div>Installed: {new Date(invite.installed_at).toLocaleString('en-GB')}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* QR Code for Tipping */}

@@ -13,6 +13,7 @@ import Exports from './pages/Exports';
 import Ledger from './pages/Ledger';
 import LocationSettings from './pages/LocationSettings';
 import Locations from './pages/Locations';
+import PublicTip from './pages/PublicTip';
 import Reconciliation from './pages/Reconciliation';
 import RulesBuilder from './pages/RulesBuilder';
 import Settings from './pages/Settings';
@@ -21,7 +22,7 @@ import SquareReviewPack from './pages/SquareReviewPack';
 import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
-import PublicTip from './pages/PublicTip';
+import EmployeeWalletInvite from './pages/EmployeeWalletInvite';
 import __Layout from './Layout.jsx';
 
 
@@ -41,6 +42,7 @@ export const PAGES = {
     "Ledger": Ledger,
     "LocationSettings": LocationSettings,
     "Locations": Locations,
+    "PublicTip": PublicTip,
     "Reconciliation": Reconciliation,
     "RulesBuilder": RulesBuilder,
     "Settings": Settings,
@@ -49,7 +51,7 @@ export const PAGES = {
     "SquareTroubleshoot": SquareTroubleshoot,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
-    "PublicTip": PublicTip,
+    "EmployeeWalletInvite": EmployeeWalletInvite,
 }
 
 export const pagesConfig = {
