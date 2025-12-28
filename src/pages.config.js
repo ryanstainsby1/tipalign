@@ -8,6 +8,7 @@ import ConnectSquare from './pages/ConnectSquare';
 import Dashboard from './pages/Dashboard';
 import Disputes from './pages/Disputes';
 import EmployeePortal from './pages/EmployeePortal';
+import EmployeeWalletInvite from './pages/EmployeeWalletInvite';
 import Employees from './pages/Employees';
 import Exports from './pages/Exports';
 import Ledger from './pages/Ledger';
@@ -22,7 +23,6 @@ import SquareReviewPack from './pages/SquareReviewPack';
 import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
-import EmployeeWalletInvite from './pages/EmployeeWalletInvite';
 import __Layout from './Layout.jsx';
 
 
@@ -37,6 +37,7 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "Disputes": Disputes,
     "EmployeePortal": EmployeePortal,
+    "EmployeeWalletInvite": EmployeeWalletInvite,
     "Employees": Employees,
     "Exports": Exports,
     "Ledger": Ledger,
@@ -51,7 +52,6 @@ export const PAGES = {
     "SquareTroubleshoot": SquareTroubleshoot,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
-    "EmployeeWalletInvite": EmployeeWalletInvite,
 }
 
 export const pagesConfig = {

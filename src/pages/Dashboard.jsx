@@ -205,10 +205,9 @@ export default function Dashboard() {
       
       const summary = [];
       if (data.entity_counts) {
-        const { locations, team_members, shifts, payments } = data.entity_counts;
+        const { locations, team_members, payments } = data.entity_counts;
         if (locations.created + locations.updated > 0) summary.push(`${locations.created + locations.updated} locations`);
         if (team_members.created + team_members.updated > 0) summary.push(`${team_members.created + team_members.updated} staff`);
-        if (shifts.created + shifts.updated > 0) summary.push(`${shifts.created + shifts.updated} shifts`);
         if (payments.created + payments.updated > 0) summary.push(`${payments.created + payments.updated} payments`);
       }
       
