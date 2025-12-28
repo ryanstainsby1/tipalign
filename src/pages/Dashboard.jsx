@@ -282,44 +282,48 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-8">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Dashboard</h1>
-            <p className="text-slate-500">Your tip management command center</p>
-            
-            {/* Achievements */}
-            {setupProgress < 100 && (
-              <div className="mt-6 flex items-center gap-4">
-                <ProgressRing progress={setupProgress} size={80} strokeWidth={6} />
-                <div className="flex gap-3">
-                  <AchievementBadge type="first_sync" unlocked={!!squareConnection} />
-                  <AchievementBadge type="team_ready" unlocked={employees.length >= 3} />
-                  <AchievementBadge type="allocation_master" unlocked={allocations.length >= 10} />
-                  <AchievementBadge type="compliance_pro" unlocked={transactions.length >= 20} />
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {squareConnection && (
-              <Button
-                variant="outline"
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-                className="border-slate-200"
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Dashboard</h1>
+              <p className="text-slate-600">Your tip management command center</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {squareConnection && (
+                <Button
+                  variant="outline"
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending}
+                  className="border-slate-300 hover:border-slate-400 shadow-sm"
+                  size="lg"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                  {syncMutation.isPending ? 'Syncing...' : 'Sync Data'}
+                </Button>
+              )}
+              <Button 
+                onClick={() => setShowExportModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 shadow-lg"
+                size="lg"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                {syncMutation.isPending ? 'Syncing...' : 'Sync Data'}
+                <Download className="w-4 h-4 mr-2" />
+                Export Payroll
               </Button>
-            )}
-            <Button 
-              onClick={() => setShowExportModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export Payroll
-            </Button>
+            </div>
           </div>
+          
+          {/* Achievements */}
+          {setupProgress < 100 && (
+            <div className="flex items-center justify-center gap-8 p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+              <ProgressRing progress={setupProgress} size={90} strokeWidth={7} />
+              <div className="flex items-center gap-4">
+                <AchievementBadge type="first_sync" unlocked={!!squareConnection} />
+                <AchievementBadge type="team_ready" unlocked={employees.length >= 3} />
+                <AchievementBadge type="allocation_master" unlocked={allocations.length >= 10} />
+                <AchievementBadge type="compliance_pro" unlocked={transactions.length >= 20} />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Connection Status Alert */}
@@ -336,173 +340,171 @@ export default function Dashboard() {
 
         {/* Square Connection */}
         {loadingConnection ? (
-          <div className="mb-8 bg-white rounded-xl p-6 shadow-sm">
-            <div className="animate-pulse flex items-center gap-4">
-              <div className="w-12 h-12 bg-slate-200 rounded-xl"></div>
+          <div className="mb-10 bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
+            <div className="animate-pulse flex items-center gap-6">
+              <div className="w-16 h-16 bg-slate-200 rounded-2xl"></div>
               <div className="flex-1">
-                <div className="h-4 bg-slate-200 rounded w-48 mb-2"></div>
-                <div className="h-3 bg-slate-200 rounded w-32"></div>
+                <div className="h-5 bg-slate-200 rounded w-56 mb-3"></div>
+                <div className="h-4 bg-slate-200 rounded w-40"></div>
               </div>
             </div>
           </div>
         ) : !squareConnection ? (
-          <Card className="mb-8 border-0 shadow-lg bg-gradient-to-br from-slate-900 to-slate-700 text-white overflow-hidden">
-            <CardContent className="p-8">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 rounded-xl bg-white/10">
-                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="4" y="4" width="16" height="16" rx="2"/>
-                      </svg>
+          <Card className="mb-10 border-0 shadow-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
+            <CardContent className="p-10">
+              <div className="flex items-center justify-between gap-8">
+                <div className="flex items-center gap-6 flex-1">
+                  <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-sm">
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">Connect with Square</h3>
+                    <p className="text-slate-300">Sync transactions, employees, and locations automatically</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-8">
+                  <div className="hidden lg:flex gap-8">
+                    <div className="text-center px-4">
+                      <div className="text-3xl font-bold mb-1">Auto</div>
+                      <div className="text-xs text-slate-400 uppercase tracking-wider">Sync</div>
                     </div>
-                    <div>
-                      <h3 className="text-xl font-semibold">Connect with Square</h3>
-                      <p className="text-sm text-slate-300 mt-1">Sync transactions, employees, and locations automatically</p>
+                    <div className="text-center px-4">
+                      <div className="text-3xl font-bold mb-1">100%</div>
+                      <div className="text-xs text-slate-400 uppercase tracking-wider">Secure</div>
+                    </div>
+                    <div className="text-center px-4">
+                      <div className="text-3xl font-bold mb-1">UK</div>
+                      <div className="text-xs text-slate-400 uppercase tracking-wider">Compliant</div>
                     </div>
                   </div>
                   <Button
                     onClick={() => connectMutation.mutate()}
                     disabled={connectMutation.isPending}
-                    className="bg-white text-slate-900 hover:bg-slate-100"
+                    className="bg-white text-slate-900 hover:bg-slate-50 shadow-xl"
                     size="lg"
                   >
                     {connectMutation.isPending ? (
                       <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
                         Connecting...
                       </>
                     ) : (
                       <>
-                        <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
                           <rect x="4" y="4" width="16" height="16" rx="2"/>
                         </svg>
-                        Connect Square Account
+                        Connect Square
                       </>
                     )}
                   </Button>
-                </div>
-                <div className="hidden md:flex gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">Auto</div>
-                    <div className="text-xs text-slate-300">Sync</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">100%</div>
-                    <div className="text-xs text-slate-300">Secure</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">UK</div>
-                    <div className="text-xs text-slate-300">Compliant</div>
-                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         ) : (
-          <Card className="mb-8 border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-white">
-            <CardContent className="p-6">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-emerald-100">
-                      <CheckCircle className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold text-slate-900">Connected to Square</h3>
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Active</Badge>
-                      </div>
-                      <p className="text-sm text-slate-600 mt-1">
-                        {squareConnection.merchant_business_name}
-                      </p>
-                      {lastSyncJob && (
-                        <div className="flex items-center gap-3 mt-2 text-xs">
-                          <span className="text-slate-500">
-                            Last sync: {format(new Date(lastSyncJob.completed_at || lastSyncJob.started_at), 'PPp')}
-                          </span>
-                          {lastSyncJob.status === 'completed' && (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 text-xs">
-                              {lastSyncJob.records_created + lastSyncJob.records_updated} records
-                            </Badge>
-                          )}
-                          {lastSyncJob.status === 'partial' && (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 text-xs">
-                              {lastSyncJob.errors?.length || 0} warnings
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
+          <Card className="mb-10 border-0 shadow-lg bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30">
+            <CardContent className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-5">
+                  <div className="p-4 rounded-2xl bg-emerald-100 shadow-sm">
+                    <CheckCircle className="w-7 h-7 text-emerald-600" />
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => syncMutation.mutate()}
-                      disabled={syncMutation.isPending}
-                      className="border-emerald-300"
-                    >
-                      <RefreshCw className={`w-4 h-4 mr-1.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                      {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowDisconnectDialog(true)}
-                      className="text-rose-600 border-rose-200 hover:bg-rose-50"
-                    >
-                      Disconnect
-                    </Button>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-xl font-bold text-slate-900">Connected to Square</h3>
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 px-3 py-1">Active</Badge>
+                    </div>
+                    <p className="text-slate-700 font-medium">
+                      {squareConnection.merchant_business_name}
+                    </p>
+                    {lastSyncJob && (
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className="text-sm text-slate-500">
+                          Last sync: {format(new Date(lastSyncJob.completed_at || lastSyncJob.started_at), 'PPp')}
+                        </span>
+                        {lastSyncJob.status === 'completed' && (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">
+                            {lastSyncJob.records_created + lastSyncJob.records_updated} records
+                          </Badge>
+                        )}
+                        {lastSyncJob.status === 'partial' && (
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
+                            {lastSyncJob.errors?.length || 0} warnings
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Sync Stats */}
-                {lastSyncJob && (
-                  <div className="grid grid-cols-4 gap-3 pt-3 border-t border-emerald-100">
-                    <div className="text-center p-3 rounded-lg bg-white/60">
-                      <p className="text-2xl font-bold text-slate-900">{locations.length}</p>
-                      <p className="text-xs text-slate-500">Locations</p>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-white/60">
-                      <p className="text-2xl font-bold text-slate-900">{employees.length}</p>
-                      <p className="text-xs text-slate-500">Team Members</p>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-white/60">
-                      <p className="text-2xl font-bold text-indigo-600">{webhookLogs.length}</p>
-                      <p className="text-xs text-slate-500">Webhooks 24h</p>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-white/60">
-                      <p className="text-2xl font-bold text-emerald-600">
-                        {lastSyncJob.status === 'completed' ? '✓' : lastSyncJob.status === 'partial' ? '⚠' : '✗'}
-                      </p>
-                      <p className="text-xs text-slate-500 capitalize">{lastSyncJob.status}</p>
-                    </div>
-                  </div>
-                )}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending}
+                    className="border-slate-300 hover:border-slate-400 shadow-sm"
+                    size="lg"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                    {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDisconnectDialog(true)}
+                    className="text-rose-600 border-rose-300 hover:bg-rose-50 shadow-sm"
+                    size="lg"
+                  >
+                    Disconnect
+                  </Button>
+                </div>
               </div>
+
+              {/* Sync Stats */}
+              {lastSyncJob && (
+                <div className="grid grid-cols-4 gap-4 pt-6 border-t border-slate-200">
+                  <div className="text-center p-4 rounded-xl bg-white shadow-sm">
+                    <p className="text-3xl font-bold text-slate-900 mb-1">{locations.length}</p>
+                    <p className="text-sm text-slate-500 font-medium">Locations</p>
+                  </div>
+                  <div className="text-center p-4 rounded-xl bg-white shadow-sm">
+                    <p className="text-3xl font-bold text-slate-900 mb-1">{employees.length}</p>
+                    <p className="text-sm text-slate-500 font-medium">Team Members</p>
+                  </div>
+                  <div className="text-center p-4 rounded-xl bg-white shadow-sm">
+                    <p className="text-3xl font-bold text-indigo-600 mb-1">{webhookLogs.length}</p>
+                    <p className="text-sm text-slate-500 font-medium">Webhooks 24h</p>
+                  </div>
+                  <div className="text-center p-4 rounded-xl bg-white shadow-sm">
+                    <p className="text-3xl font-bold text-emerald-600 mb-1">
+                      {lastSyncJob.status === 'completed' ? '✓' : lastSyncJob.status === 'partial' ? '⚠' : '✗'}
+                    </p>
+                    <p className="text-sm text-slate-500 font-medium capitalize">{lastSyncJob.status}</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
         {/* Empty State - No Data */}
         {!squareConnection && transactions.length === 0 && employees.length === 0 && (
-          <Card className="mb-8 border-0 shadow-sm">
-            <CardContent className="p-12 text-center">
-              <div className="max-w-md mx-auto">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
+          <Card className="mb-10 border-0 shadow-lg">
+            <CardContent className="py-20 text-center">
+              <div className="max-w-lg mx-auto">
+                <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                  <svg className="w-10 h-10 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
                     <rect x="4" y="4" width="16" height="16" rx="2"/>
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-2">Connect Square to Get Started</h3>
-                <p className="text-slate-600 mb-6">
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">Connect Square to Get Started</h3>
+                <p className="text-slate-600 text-lg mb-8 leading-relaxed">
                   Link your Square account to automatically import locations, staff, and transactions.
                 </p>
                 <Button
                   onClick={() => connectMutation.mutate()}
                   disabled={connectMutation.isPending}
-                  className="bg-indigo-600 hover:bg-indigo-700"
+                  className="bg-indigo-600 hover:bg-indigo-700 shadow-lg"
                   size="lg"
                 >
                   {connectMutation.isPending ? (
@@ -525,7 +527,7 @@ export default function Dashboard() {
         )}
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <LiveMetric
             title="Total Tips This Month"
             value={formatCurrency(totalTips)}
