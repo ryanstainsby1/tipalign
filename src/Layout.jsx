@@ -29,14 +29,31 @@ import {
 import { base44 } from '@/api/base44Client';
 import AppLogo from '@/components/common/AppLogo';
 
-const navigation = [
-  { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
-  { name: 'Locations', page: 'Locations', icon: MapPin },
-  { name: 'Employees', page: 'Employees', icon: Users },
-  { name: 'Allocations', page: 'Allocations', icon: PieChart },
-  { name: 'Compliance', page: 'Compliance', icon: Shield },
-  { name: 'Settings', page: 'Settings', icon: Settings },
-  { name: 'Square Help', page: 'SquareTroubleshoot', icon: Activity },
+const navigationSections = [
+  {
+    label: 'OPERATIONS',
+    items: [
+      { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard, color: 'text-purple-600' },
+      { name: 'Allocations', page: 'Allocations', icon: PieChart, color: 'text-orange-600' },
+      { name: 'Locations', page: 'Locations', icon: MapPin, color: 'text-orange-600' },
+      { name: 'Employees', page: 'Employees', icon: Users, color: 'text-emerald-600' },
+    ]
+  },
+  {
+    label: 'COMPLIANCE & REPORTING',
+    items: [
+      { name: 'Compliance', page: 'Compliance', icon: Shield, color: 'text-rose-600' },
+      { name: 'Reconciliation', page: 'Reconciliation', icon: RefreshCw, color: 'text-teal-600' },
+      { name: 'Employee Portal', page: 'EmployeePortal', icon: User, color: 'text-purple-600' },
+    ]
+  },
+  {
+    label: 'SUPPORT',
+    items: [
+      { name: 'Square Help', page: 'SquareTroubleshoot', icon: Activity, color: 'text-slate-500' },
+      { name: 'Settings', page: 'Settings', icon: Settings, color: 'text-slate-500' },
+    ]
+  }
 ];
 
 export default function Layout({ children, currentPageName }) {
@@ -77,51 +94,61 @@ export default function Layout({ children, currentPageName }) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navigation.map((item) => {
-              const isActive = currentPageName === item.page;
-              return (
-                <Link
-                  key={item.name}
-                  to={createPageUrl(item.page)}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                    transition-all duration-150
-                    ${isActive 
-                      ? 'bg-indigo-50 text-indigo-700' 
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }
-                  `}
-                >
-                  <item.icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                  {item.name}
-                  {isActive && <ChevronRight className="w-4 h-4 ml-auto text-indigo-400" />}
-                </Link>
-              );
-            })}
+          <nav className="flex-1 px-3 py-6 overflow-y-auto">
+            {navigationSections.map((section, sectionIndex) => (
+              <div key={section.label} className={sectionIndex > 0 ? 'mt-6' : ''}>
+                {/* Section Label */}
+                <div className="px-3 mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    {section.label}
+                  </p>
+                </div>
+
+                {/* Section Items */}
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    const isActive = currentPageName === item.page;
+                    return (
+                      <Link
+                        key={item.name}
+                        to={createPageUrl(item.page)}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`
+                          flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                          transition-all duration-150 relative
+                          ${isActive 
+                            ? 'bg-blue-50 text-indigo-600 font-semibold' 
+                            : 'text-slate-600 font-normal hover:bg-slate-50 hover:text-slate-900'
+                          }
+                        `}
+                      >
+                        {isActive && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600 rounded-r-full" />
+                        )}
+                        <item.icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : item.color}`} />
+                        {item.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                {/* Section Divider */}
+                {sectionIndex < navigationSections.length - 1 && (
+                  <div className="mt-4 px-3">
+                    <div className="h-px bg-slate-200" />
+                  </div>
+                )}
+              </div>
+            ))}
           </nav>
 
-          {/* Additional Links */}
-          <div className="px-3 py-2 space-y-1 border-t border-slate-100">
-            <Link
-              to={createPageUrl('Reconciliation')}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            >
-              <RefreshCw className="w-5 h-5 text-slate-400" />
-              Reconciliation
-            </Link>
-            <Link
-              to={createPageUrl('EmployeePortal')}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            >
-              <User className="w-5 h-5 text-slate-400" />
-              Employee Portal
-            </Link>
-          </div>
+
 
           {/* User menu */}
-          <div className="p-4 border-t border-slate-100">
+          <div className="px-3 py-4">
+            <div className="h-px bg-slate-200 mb-4" />
+          </div>
+          <div className="px-4 pb-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors">
