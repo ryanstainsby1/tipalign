@@ -3,6 +3,7 @@ import Allocations from './pages/Allocations';
 import ButtonWiringChecklist from './pages/ButtonWiringChecklist';
 import Compliance from './pages/Compliance';
 import ComplianceNotes from './pages/ComplianceNotes';
+import ComplianceSettings from './pages/ComplianceSettings';
 import ConnectSquare from './pages/ConnectSquare';
 import Dashboard from './pages/Dashboard';
 import Disputes from './pages/Disputes';
@@ -20,7 +21,6 @@ import SquareReviewPack from './pages/SquareReviewPack';
 import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
-import ComplianceSettings from './pages/ComplianceSettings';
 import __Layout from './Layout.jsx';
 
 
@@ -30,6 +30,7 @@ export const PAGES = {
     "ButtonWiringChecklist": ButtonWiringChecklist,
     "Compliance": Compliance,
     "ComplianceNotes": ComplianceNotes,
+    "ComplianceSettings": ComplianceSettings,
     "ConnectSquare": ConnectSquare,
     "Dashboard": Dashboard,
     "Disputes": Disputes,
@@ -47,7 +48,6 @@ export const PAGES = {
     "SquareTroubleshoot": SquareTroubleshoot,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
-    "ComplianceSettings": ComplianceSettings,
 }
 
 export const pagesConfig = {
