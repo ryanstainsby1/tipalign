@@ -19,10 +19,13 @@ import PayrollExportModal from '@/components/exports/PayrollExportModal';
 import SyncHistory from '@/components/dashboard/SyncHistory';
 import AchievementBadge from '@/components/dashboard/AchievementBadge';
 import ProgressRing from '@/components/dashboard/ProgressRing';
+import RevenueVsTipsChart from '@/components/dashboard/RevenueVsTipsChart';
+import LocationBreakdown from '@/components/dashboard/LocationBreakdown';
 
 export default function Dashboard() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [dateRange, setDateRange] = useState(30);
   const queryClient = useQueryClient();
 
   // Check URL params for Square connection status
@@ -120,6 +123,25 @@ export default function Dashboard() {
       const hasRunningJob = Array.isArray(data) && data.some(job => job.status === 'running');
       return hasRunningJob ? 3000 : false;
     }
+  });
+
+  const { data: dailySummaries = [] } = useQuery({
+    queryKey: ['dailySummaries', dateRange],
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - dateRange);
+      
+      const summaries = await base44.entities.DailyRevenueSummary.filter({
+        organization_id: user.organization_id || user.id
+      });
+      
+      return summaries.filter(s => {
+        const date = new Date(s.business_date);
+        return date >= startDate && date <= endDate;
+      }).sort((a, b) => new Date(a.business_date) - new Date(b.business_date));
+    },
   });
 
   const { data: webhookLogs = [] } = useQuery({
@@ -244,6 +266,38 @@ export default function Dashboard() {
 
   const totalTips = transactions.reduce((sum, tx) => sum + (tx.tip_amount || 0), 0);
   const pendingAllocations = allocations.filter(a => a.status === 'pending').length;
+
+  // Calculate metrics from DailyRevenueSummary
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  
+  const thisMonthSummaries = dailySummaries.filter(s => {
+    const date = new Date(s.business_date);
+    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+  });
+
+  const totalRevenue = thisMonthSummaries.reduce((sum, s) => sum + (s.total_gross_revenue_pence || 0), 0);
+  const totalTipsFromRevenue = thisMonthSummaries.reduce((sum, s) => sum + (s.total_tip_pence || 0), 0);
+  const avgTipRate = totalRevenue > 0 ? (totalTipsFromRevenue / totalRevenue) * 100 : 0;
+
+  // Location breakdown
+  const locationStats = locations.map(loc => {
+    const locSummaries = thisMonthSummaries.filter(s => s.location_id === loc.id);
+    const revenue = locSummaries.reduce((sum, s) => sum + (s.total_gross_revenue_pence || 0), 0);
+    const tips = locSummaries.reduce((sum, s) => sum + (s.total_tip_pence || 0), 0);
+    const transactions = locSummaries.reduce((sum, s) => sum + (s.transaction_count || 0), 0);
+    const tipRate = revenue > 0 ? (tips / revenue) * 100 : 0;
+    const avgTipPerTransaction = transactions > 0 ? tips / transactions : 0;
+
+    return {
+      locationId: loc.id,
+      locationName: loc.name,
+      revenue,
+      tips,
+      tipRate,
+      avgTipPerTransaction
+    };
+  });
   
   const last14Days = Array.from({ length: 14 }, (_, i) => {
     const date = subDays(new Date(), 13 - i);
@@ -511,31 +565,31 @@ export default function Dashboard() {
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <MetricCardPro
-            title="Total Tips This Month"
-            value={formatCurrency(totalTips)}
-            trend={totalTips > 0 ? "+12.5% vs last period" : null}
-            trendColor="emerald"
+            title="Total Revenue"
+            value={formatCurrency(totalRevenue)}
+            trend="Gross card revenue (Square)"
+            trendColor="gray"
             icon={PoundSterling}
             bgColor="indigo"
           />
           <MetricCardPro
-            title="Across all locations"
-            value={employees.length}
-            trend={employees.length > 0 ? `+${Math.min(3, employees.length)} new this month` : "No team members"}
-            trendColor={employees.length > 0 ? "gray" : "gray"}
-            icon={Users}
+            title="Total Tips"
+            value={formatCurrency(totalTipsFromRevenue)}
+            trend="Card tips via Square"
+            trendColor="emerald"
+            icon={PoundSterling}
             bgColor="emerald"
           />
           <MetricCardPro
-            title="Connected to Square"
-            value={locations.length}
-            trend="All synced"
-            trendColor="emerald"
-            icon={MapPin}
+            title="Tip Rate"
+            value={`${avgTipRate.toFixed(1)}%`}
+            trend="Average tip % of revenue"
+            trendColor={avgTipRate >= 15 ? "emerald" : "gray"}
+            icon={FileCheck}
             bgColor="amber"
           />
           <MetricCardPro
-            title="Allocations awaiting confirmation"
+            title="Pending Allocations"
             value={pendingAllocations}
             trend={pendingAllocations === 0 ? "All clear" : `${pendingAllocations} waiting`}
             trendColor={pendingAllocations === 0 ? "emerald" : "gray"}
@@ -543,6 +597,35 @@ export default function Dashboard() {
             bgColor="blue"
           />
         </div>
+
+        {/* Revenue vs Tips Chart */}
+        {dailySummaries.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-slate-900">Revenue Insights</h2>
+              <div className="flex gap-2">
+                {[7, 30, 90].map(days => (
+                  <Button
+                    key={days}
+                    variant={dateRange === days ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDateRange(days)}
+                  >
+                    {days} days
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <RevenueVsTipsChart data={dailySummaries} />
+          </div>
+        )}
+
+        {/* Location Breakdown */}
+        {locationStats.length > 0 && (
+          <div className="mb-10">
+            <LocationBreakdown data={locationStats} />
+          </div>
+        )}
 
         {/* Compliance Status */}
         <div className="mb-10">
