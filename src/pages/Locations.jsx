@@ -12,7 +12,12 @@ export default function Locations() {
 
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['locations'],
-    queryFn: () => base44.entities.Location.list(),
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      return await base44.entities.Location.filter({ 
+        organization_id: user.organization_id || user.id 
+      });
+    },
   });
 
   const filteredLocations = locations.filter(loc => 
