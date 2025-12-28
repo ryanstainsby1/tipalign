@@ -27,7 +27,11 @@ export default function LocationCard({ location }) {
               <h3 className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
                 {location.name}
               </h3>
-              <p className="text-sm text-slate-500">{location.address || 'No address set'}</p>
+              <p className="text-sm text-slate-500">
+                {location.address 
+                  ? `${location.address.line1 || ''}${location.address.city ? ', ' + location.address.city : ''}`.trim() || 'No address set'
+                  : 'No address set'}
+              </p>
             </div>
           </div>
           <Link 
