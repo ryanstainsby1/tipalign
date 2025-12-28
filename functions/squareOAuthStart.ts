@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       ? 'https://connect.squareup.com/oauth2/authorize'
       : 'https://connect.squareupsandbox.com/oauth2/authorize';
 
-    const callbackUrl = `${BASE_URL}/api/squareCallback`;
+    const callbackUrl = `${BASE_URL}/functions/squareCallback`;
 
     const params = new URLSearchParams({
       client_id: SQUARE_APP_ID,
