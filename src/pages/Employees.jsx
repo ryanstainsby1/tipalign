@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import EmployeeTable from '@/components/employees/EmployeeTable';
 import EmployeeTipHistory from '@/components/employee/EmployeeTipHistory';
+import WalletPassSection from '@/components/employees/WalletPassSection';
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Employees() {
@@ -16,6 +17,7 @@ export default function Employees() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [viewingHistory, setViewingHistory] = useState(null);
+  const [viewingWallet, setViewingWallet] = useState(null);
   const [editForm, setEditForm] = useState({});
 
   const queryClient = useQueryClient();
@@ -29,6 +31,15 @@ export default function Employees() {
     queryKey: ['allocations', viewingHistory?.id],
     queryFn: () => base44.entities.TipAllocation.filter({ employee_id: viewingHistory?.id }),
     enabled: !!viewingHistory,
+  });
+
+  const { data: walletPasses = [] } = useQuery({
+    queryKey: ['walletPasses', viewingWallet?.id],
+    queryFn: () => base44.entities.EmployeeWalletPass.filter({ 
+      employee_id: viewingWallet?.id,
+      pass_status: 'active'
+    }),
+    enabled: !!viewingWallet,
   });
 
   const updateMutation = useMutation({
@@ -118,6 +129,7 @@ export default function Employees() {
             employees={filteredEmployees}
             onEdit={handleEdit}
             onViewHistory={(emp) => setViewingHistory(emp)}
+            onViewWallet={(emp) => setViewingWallet(emp)}
           />
         )}
 
@@ -183,6 +195,17 @@ export default function Employees() {
             <EmployeeTipHistory 
               allocations={allocations}
               employeeName={viewingHistory?.full_name}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Wallet Pass Dialog */}
+        <Dialog open={!!viewingWallet} onOpenChange={() => setViewingWallet(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <WalletPassSection 
+              employee={viewingWallet}
+              walletPass={walletPasses[0] || null}
+              onRefresh={() => queryClient.invalidateQueries({ queryKey: ['walletPasses'] })}
             />
           </DialogContent>
         </Dialog>
