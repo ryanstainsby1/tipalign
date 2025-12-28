@@ -225,6 +225,31 @@ export default function Dashboard() {
     }
   });
 
+  const salesSyncMutation = useMutation({
+    mutationFn: async () => {
+      if (!squareConnection) {
+        throw new Error('No Square connection found');
+      }
+      const response = await base44.functions.invoke('squareSalesSync', {
+        connection_id: squareConnection.id
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['dailySummaries'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      
+      toast.success(
+        `Sales sync complete! ${data.total_payments || 0} payments processed (${data.created_summaries || 0} new, ${data.updated_summaries || 0} updated)`,
+        { duration: 5000 }
+      );
+    },
+    onError: (error) => {
+      logError({ page: 'Dashboard', action: 'syncSales', error });
+      toast.error('Sales sync failed: ' + error.message);
+    }
+  });
+
   const disconnectMutation = useMutation({
     mutationFn: async () => {
       if (!squareConnection) throw new Error('No connection');
@@ -337,16 +362,28 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-3">
               {squareConnection && (
-                <Button
-                  variant="outline"
-                  onClick={() => syncMutation.mutate()}
-                  disabled={syncMutation.isPending}
-                  className="border-slate-300 hover:border-slate-400 shadow-sm"
-                  size="lg"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                  {syncMutation.isPending ? 'Syncing...' : 'Sync Data'}
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending || salesSyncMutation.isPending}
+                    className="border-slate-300 hover:border-slate-400 shadow-sm"
+                    size="lg"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                    {syncMutation.isPending ? 'Syncing...' : 'Sync Data'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => salesSyncMutation.mutate()}
+                    disabled={syncMutation.isPending || salesSyncMutation.isPending}
+                    className="border-indigo-300 hover:border-indigo-400 shadow-sm"
+                    size="lg"
+                  >
+                    <PoundSterling className={`w-4 h-4 mr-2 ${salesSyncMutation.isPending ? 'animate-spin' : ''}`} />
+                    {salesSyncMutation.isPending ? 'Syncing Sales...' : 'Sync Sales'}
+                  </Button>
+                </>
               )}
               <Button 
                 onClick={() => setShowExportModal(true)}
