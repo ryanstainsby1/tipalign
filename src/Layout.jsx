@@ -66,7 +66,7 @@ export default function Layout({ children, currentPageName }) {
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100">
+          <div className="flex items-center justify-between h-20 px-6 border-b border-slate-100">
             <AppLogo size="default" />
             <button 
               className="lg:hidden p-1 text-slate-400 hover:text-slate-600"
