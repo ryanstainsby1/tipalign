@@ -67,10 +67,11 @@ export default function Layout({ children, currentPageName }) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100">
             <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">T</span>
-              </div>
-              <span className="font-semibold text-slate-900 text-lg">TipFlow</span>
+              <img 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
+                alt="Tiply Logo" 
+                className="h-8 w-auto"
+              />
             </Link>
             <button 
               className="lg:hidden p-1 text-slate-400 hover:text-slate-600"
@@ -182,10 +183,11 @@ export default function Layout({ children, currentPageName }) {
               <Menu className="w-5 h-5" />
             </button>
             <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
-                <span className="text-white font-bold text-xs">T</span>
-              </div>
-              <span className="font-semibold text-slate-900">TipFlow</span>
+              <img 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
+                alt="Tiply Logo" 
+                className="h-7 w-auto"
+              />
             </Link>
             <div className="w-10" /> {/* Spacer for centering */}
           </div>
