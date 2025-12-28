@@ -13,7 +13,24 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
   try {
-    const { connection_id, start_date, end_date } = await req.json();
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'method_not_allowed' }),
+        { status: 405, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'invalid_json_body' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { connection_id, start_date, end_date } = body;
 
     if (!connection_id) {
       return new Response(
@@ -22,19 +39,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    const connections = await base44.asServiceRole.entities.SquareConnection.filter({
-      id: connection_id
-    });
+    const connection = await base44.asServiceRole.entities.SquareConnection.retrieve(connection_id);
 
-    if (connections.length === 0 || connections[0].connection_status !== 'connected') {
+    if (!connection) {
       return new Response(
-        JSON.stringify({ success: false, error: 'invalid_connection' }),
+        JSON.stringify({ success: false, error: 'connection_not_found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (connection.connection_status !== 'connected') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'connection_not_active' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const connection = connections[0];
-    const accessToken = connection.square_access_token_encrypted?.trim();
+    const accessToken = (connection.square_access_token_encrypted || '').trim();
     if (!accessToken) {
       return new Response(
         JSON.stringify({ success: false, error: 'missing_access_token' }),
@@ -64,19 +85,22 @@ Deno.serve(async (req) => {
     });
 
     if (!locationsRes.ok) {
-      const err = await locationsRes.text();
-      console.error('Square locations error:', err);
+      const text = await locationsRes.text();
+      console.error('Square locations error', locationsRes.status, text);
       return new Response(
         JSON.stringify({
           success: false,
+          step: 'locations',
+          status: locationsRes.status,
           error: 'square_locations_failed',
-          details: err,
+          details: text,
         }),
         { status: 502, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const { locations = [] } = await locationsRes.json();
+    const locJson = await locationsRes.json();
+    const locations = locJson.locations || [];
 
     let totalPayments = 0;
     let createdSummaries = 0;
@@ -110,14 +134,14 @@ Deno.serve(async (req) => {
         );
 
         if (!paymentsRes.ok) {
-          const err = await paymentsRes.text();
-          console.error('Square payments error:', { locationId, err });
+          const text = await paymentsRes.text();
+          console.error('Square payments error', { locationId, status: paymentsRes.status, text });
           break;
         }
 
-        const data = await paymentsRes.json();
-        const payments = data.payments || [];
-        cursor = data.cursor || undefined;
+        const payJson = await paymentsRes.json();
+        const payments = payJson.payments || [];
+        cursor = payJson.cursor || undefined;
 
         console.log(`  - Fetched ${payments.length} payments${cursor ? ' (more pages)' : ''}`);
 
@@ -130,7 +154,6 @@ Deno.serve(async (req) => {
           const amountMoney = p.amount_money || {};
           const totalMoney = p.total_money || {};
           const tipMoney = p.tip_money || {};
-
           const grossAmount = amountMoney.amount ?? 0;
           const totalAmount = totalMoney.amount ?? 0;
           const tipAmount = tipMoney.amount ?? 0;
@@ -140,39 +163,41 @@ Deno.serve(async (req) => {
             (sum, f) => sum + (f.amount_money?.amount ?? 0),
             0
           );
-
           const netAmount = totalAmount - totalFees;
-
-          const teamMemberId = p.team_member_id || null;
-          const sourceType = p.source_type || null;
-          const cardBrand =
-            p.card_details?.card?.card_brand || (p.cash_details ? 'CASH' : null);
-
-          const createdAt = p.created_at || null;
-          const orderId = p.order_id || null;
-
-          // Upsert into SquarePaymentSummary
-          const existing = await base44.asServiceRole.entities.SquarePaymentSummary.filter({
-            organization_id: connection.organization_id,
-            square_payment_id: paymentId,
-          });
 
           const payload = {
             organization_id: connection.organization_id,
             location_id: locationId,
             square_payment_id: paymentId,
-            square_order_id: orderId,
-            payment_created_at: createdAt,
+            square_order_id: p.order_id || null,
+            payment_created_at: p.created_at || null,
             gross_amount_pence: grossAmount,
             tip_amount_pence: tipAmount,
             total_amount_pence: totalAmount,
             processing_fee_pence: totalFees,
             net_amount_pence: netAmount,
-            team_member_id: teamMemberId,
-            source: sourceType,
-            card_brand: cardBrand,
+            team_member_id: p.team_member_id || null,
+            source: p.source_type || null,
+            card_brand: p.card_details?.card?.card_brand || (p.cash_details ? 'CASH' : null),
             synced_at: new Date().toISOString(),
           };
+
+          if (!base44.asServiceRole.entities.SquarePaymentSummary) {
+            console.error('Entity SquarePaymentSummary is not defined');
+            return new Response(
+              JSON.stringify({ success: false, error: 'entity_SquarePaymentSummary_missing' }),
+              { status: 500, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+
+          const existing = await base44.asServiceRole.entities.SquarePaymentSummary.filter(
+            {
+              organization_id: connection.organization_id,
+              square_payment_id: paymentId,
+            },
+            '-created_date',
+            1
+          );
 
           if (existing.length > 0) {
             await base44.asServiceRole.entities.SquarePaymentSummary.update(
@@ -281,13 +306,13 @@ Deno.serve(async (req) => {
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
-    console.error('squareSalesSync error:', error);
+  } catch (err) {
+    console.error('squareSalesSync fatal error:', err);
     return new Response(
       JSON.stringify({
         success: false,
         error: 'unexpected_error',
-        message: error.message,
+        message: err.message,
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
