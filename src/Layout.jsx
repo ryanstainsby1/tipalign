@@ -50,7 +50,6 @@ const navigationSections = [
   {
     label: 'SUPPORT',
     items: [
-      { name: 'Square Help', page: 'SquareTroubleshoot', icon: Activity, color: 'text-slate-500' },
       { name: 'Settings', page: 'Settings', icon: Settings, color: 'text-slate-500' },
     ]
   }
