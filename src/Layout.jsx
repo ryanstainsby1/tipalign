@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Toaster } from 'sonner';
 import { 
@@ -57,6 +57,29 @@ const navigationSections = [
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const user = await base44.auth.me();
+        setCurrentUser(user);
+        
+        // Redirect staff users to Employee Portal if they try to access admin pages
+        const staffOnlyPages = ['EmployeePortal'];
+        const adminPages = ['Dashboard', 'Allocations', 'Locations', 'Employees', 'Compliance', 'Reconciliation', 'Settings'];
+        
+        if (user.role === 'user' && !staffOnlyPages.includes(currentPageName)) {
+          navigate(createPageUrl('EmployeePortal'));
+        }
+      } catch (error) {
+        console.error('Failed to check user role:', error);
+      }
+    };
+    
+    checkUserRole();
+  }, [currentPageName, navigate]);
 
   const handleLogout = () => {
     base44.auth.logout();
@@ -94,6 +117,22 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-6 overflow-y-auto">
+            {currentUser?.role === 'user' ? (
+              // Staff user - only show Employee Portal
+              <div className="space-y-1">
+                <Link
+                  to={createPageUrl('EmployeePortal')}
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-blue-50 text-indigo-600 font-semibold"
+                >
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600 rounded-r-full" />
+                  <User className="w-5 h-5 text-indigo-600" />
+                  My Tips
+                </Link>
+              </div>
+            ) : (
+              // Admin/Manager - show full navigation
+              <>
             {navigationSections.map((section, sectionIndex) => (
               <div key={section.label} className={sectionIndex > 0 ? 'mt-6' : ''}>
                 {/* Section Label */}
@@ -137,9 +176,11 @@ export default function Layout({ children, currentPageName }) {
                     <div className="h-px bg-slate-200" />
                   </div>
                 )}
-              </div>
-            ))}
-          </nav>
+                </div>
+                ))}
+                </>
+                )}
+                </nav>
 
 
 
@@ -153,12 +194,12 @@ export default function Layout({ children, currentPageName }) {
                 <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors">
                   <Avatar className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500">
                     <AvatarFallback className="bg-transparent text-white text-sm font-medium">
-                      AD
+                      {currentUser?.full_name?.substring(0, 2).toUpperCase() || 'US'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-slate-900">Admin User</p>
-                    <p className="text-xs text-slate-500">admin@demo.com</p>
+                    <p className="text-sm font-medium text-slate-900">{currentUser?.full_name || 'User'}</p>
+                    <p className="text-xs text-slate-500">{currentUser?.email || ''}</p>
                   </div>
                 </button>
               </DropdownMenuTrigger>

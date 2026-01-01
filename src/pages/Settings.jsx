@@ -66,17 +66,18 @@ export default function Settings() {
     queryFn: () => base44.entities.Location.list(),
   });
 
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['allUsers'],
+    queryFn: async () => {
+      return await base44.entities.User.list('-created_date', 100);
+    },
+  });
+
   const menuItems = [
     { id: 'profile', label: 'Organization Profile', icon: Building2 },
     { id: 'users', label: 'Users & Permissions', icon: Users },
     { id: 'api', label: 'API Credentials', icon: Key },
     { id: 'notifications', label: 'Notifications', icon: Bell },
-  ];
-
-  const mockUsers = [
-    { name: 'Admin User', email: 'admin@demo.com', role: 'Admin', lastActive: '2025-12-28', id: 1 },
-    { name: 'John Manager', email: 'john@demo.com', role: 'Manager', lastActive: '2025-12-27', id: 2 },
-    { name: 'Sarah Staff', email: 'sarah@demo.com', role: 'Staff', lastActive: '2025-12-26', id: 3 },
   ];
 
   const mockAPIKeys = [
@@ -100,6 +101,7 @@ export default function Settings() {
   const handleAddUser = async (userData) => {
     try {
       await base44.users.inviteUser(userData.email, userData.role);
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
       toast.success('User invited successfully', {
         description: `Invitation sent to ${userData.email}`
       });
@@ -268,15 +270,20 @@ export default function Settings() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {mockUsers.map(user => (
+                        {allUsers.map(user => (
                           <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.name}</TableCell>
+                            <TableCell className="font-medium">{user.full_name || 'Pending'}</TableCell>
                             <TableCell>{user.email}</TableCell>
                             <TableCell>
-                              <Badge variant="outline">{user.role}</Badge>
+                              <Badge variant="outline" className={
+                                user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' :
+                                user.role === 'user' ? 'bg-slate-100 text-slate-700' : ''
+                              }>
+                                {user.role}
+                              </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-slate-600">
-                              {format(new Date(user.lastActive), 'MMM d, yyyy')}
+                              {user.updated_date ? format(new Date(user.updated_date), 'MMM d, yyyy') : 'Never'}
                             </TableCell>
                             <TableCell className="text-right">
                               <DropdownMenu>
@@ -286,7 +293,7 @@ export default function Settings() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem>Edit</DropdownMenuItem>
+                                  <DropdownMenuItem>Change Role</DropdownMenuItem>
                                   <DropdownMenuItem className="text-rose-600">Remove</DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
