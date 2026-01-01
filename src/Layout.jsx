@@ -66,11 +66,10 @@ export default function Layout({ children, currentPageName }) {
         const user = await base44.auth.me();
         setCurrentUser(user);
         
-        // Redirect staff users to Employee Portal if they try to access admin pages
-        const staffOnlyPages = ['EmployeePortal'];
-        const adminPages = ['Dashboard', 'Allocations', 'Locations', 'Employees', 'Compliance', 'Reconciliation', 'Settings'];
+        // Redirect staff users away from admin pages
+        const adminPages = ['Dashboard', 'Allocations', 'Locations', 'Employees', 'Compliance', 'Reconciliation', 'Settings', 'ButtonWiringChecklist', 'SmokeTest'];
         
-        if (user.role === 'user' && !staffOnlyPages.includes(currentPageName)) {
+        if (user.role === 'user' && adminPages.includes(currentPageName)) {
           navigate(createPageUrl('EmployeePortal'));
         }
       } catch (error) {

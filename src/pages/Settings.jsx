@@ -354,19 +354,13 @@ export default function Settings() {
                         <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
                           <h4 className="font-semibold text-indigo-900 mb-2">Admin</h4>
                           <p className="text-sm text-indigo-700">
-                            Full access to all features. Can manage users, settings, allocations, and exports.
-                          </p>
-                        </div>
-                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                          <h4 className="font-semibold text-emerald-900 mb-2">Manager</h4>
-                          <p className="text-sm text-emerald-700">
-                            Can view all locations, approve allocations, and export payroll data.
+                            Full access to all features including dashboard, allocations, locations, employees, compliance, payroll exports, and settings management.
                           </p>
                         </div>
                         <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
                           <h4 className="font-semibold text-amber-900 mb-2">Staff</h4>
                           <p className="text-sm text-amber-700">
-                            Can only view their own tips through the Employee Portal.
+                            Limited to Employee Portal only. Can view their own tips, allocations, and tip history. Cannot access admin features.
                           </p>
                         </div>
                       </CardContent>
