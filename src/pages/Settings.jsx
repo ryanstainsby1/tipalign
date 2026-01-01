@@ -97,10 +97,15 @@ export default function Settings() {
     payrollExports: true
   });
 
-  const handleAddUser = (userData) => {
-    toast.success('User invited successfully', {
-      description: `Invitation sent to ${userData.email}`
-    });
+  const handleAddUser = async (userData) => {
+    try {
+      await base44.users.inviteUser(userData.email, userData.role);
+      toast.success('User invited successfully', {
+        description: `Invitation sent to ${userData.email}`
+      });
+    } catch (error) {
+      toast.error('Failed to invite user: ' + error.message);
+    }
   };
 
   const handleGenerateAPIKey = (keyData) => {
