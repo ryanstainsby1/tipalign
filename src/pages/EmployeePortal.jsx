@@ -32,13 +32,13 @@ export default function EmployeePortal() {
     queryFn: () => base44.auth.me(),
   });
 
-  const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
+  const { data: employees = [], isLoading: loadingEmployee } = useQuery({
+    queryKey: ['employees', user?.id],
     queryFn: () => base44.entities.Employee.filter({ user_id: user?.id }),
     enabled: !!user,
   });
 
-  const currentEmployee = employees[0];
+  const currentEmployee = employees.length > 0 ? employees[0] : null;
 
   const { data: allocations = [] } = useQuery({
     queryKey: ['my-allocations', currentEmployee?.id],
@@ -148,12 +148,28 @@ export default function EmployeePortal() {
     }
   };
 
-  if (!currentEmployee) {
+  if (loadingEmployee) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center">
         <div className="text-center">
           <p className="text-lg text-slate-600">Loading your portal...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!currentEmployee) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Employee Record Not Found</h2>
+            <p className="text-slate-600">
+              Your user account is not linked to an employee record. Please contact your manager to link your account.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
