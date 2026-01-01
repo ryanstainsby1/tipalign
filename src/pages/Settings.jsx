@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import AddUserModal from '@/components/settings/AddUserModal';
 import CreateAPIKeyModal from '@/components/settings/CreateAPIKeyModal';
+import ChangeRoleModal from '@/components/settings/ChangeRoleModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,8 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState('profile');
   const [showAddUser, setShowAddUser] = useState(false);
   const [showCreateKey, setShowCreateKey] = useState(false);
+  const [showChangeRole, setShowChangeRole] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [roleDefinitionsOpen, setRoleDefinitionsOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -107,6 +110,26 @@ export default function Settings() {
       });
     } catch (error) {
       toast.error('Failed to invite user: ' + error.message);
+    }
+  };
+
+  const handleChangeRole = async (userId, newRole) => {
+    try {
+      await base44.entities.User.update(userId, { role: newRole });
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      toast.success('User role updated successfully');
+    } catch (error) {
+      toast.error('Failed to update role: ' + error.message);
+    }
+  };
+
+  const handleRemoveUser = async (userId) => {
+    try {
+      await base44.entities.User.delete(userId);
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      toast.success('User removed successfully');
+    } catch (error) {
+      toast.error('Failed to remove user: ' + error.message);
     }
   };
 
@@ -293,8 +316,22 @@ export default function Settings() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem>Change Role</DropdownMenuItem>
-                                  <DropdownMenuItem className="text-rose-600">Remove</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    setSelectedUser(user);
+                                    setShowChangeRole(true);
+                                  }}>
+                                    Change Role
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className="text-rose-600"
+                                    onClick={() => {
+                                      if (confirm(`Remove ${user.email}?`)) {
+                                        handleRemoveUser(user.id);
+                                      }
+                                    }}
+                                  >
+                                    Remove
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
@@ -517,6 +554,16 @@ export default function Settings() {
         open={showCreateKey}
         onClose={() => setShowCreateKey(false)}
         onGenerate={handleGenerateAPIKey}
+      />
+
+      <ChangeRoleModal
+        open={showChangeRole}
+        onClose={() => {
+          setShowChangeRole(false);
+          setSelectedUser(null);
+        }}
+        user={selectedUser}
+        onUpdate={handleChangeRole}
       />
     </div>
   );
