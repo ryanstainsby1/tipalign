@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
       : 'https://connect.squareupsandbox.com/oauth2/authorize';
 
     const clientId = Deno.env.get('SQUARE_APP_ID');
-    const redirectUri = 'https://tip-align-29fe435b.base44.app/api/squareCallback';
+    const redirectUri = 'https://tip-align-29fe435b.base44.app/functions/squareCallback';
     const scopes = [
       'MERCHANT_PROFILE_READ',
       'PAYMENTS_READ',
