@@ -186,8 +186,8 @@ export default function Dashboard() {
       return response.data;
     },
     onSuccess: (data) => {
-      if (data.success && data.auth_url) {
-        window.location.href = data.auth_url;
+      if (data.success && data.redirect_url) {
+        window.location.href = data.redirect_url;
       } else {
         toast.error('Unable to start Square connect. Please try again or contact support.');
       }
