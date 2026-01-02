@@ -19,24 +19,41 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Employee not found' }, { status: 404 });
       }
 
-      // Create membership
-      await base44.asServiceRole.entities.UserOrganizationMembership.create({
+      // Check if membership already exists
+      const existingMembership = await base44.asServiceRole.entities.UserOrganizationMembership.filter({
         user_id: user.id,
-        organization_id: organization_id,
-        membership_role: 'employee',
-        status: 'active'
+        organization_id: organization_id
       });
 
-      // Create Square link
-      await base44.asServiceRole.entities.SquareTeamMemberLink.create({
+      if (existingMembership.length === 0) {
+        await base44.asServiceRole.entities.UserOrganizationMembership.create({
+          user_id: user.id,
+          organization_id: organization_id,
+          membership_role: 'employee',
+          status: 'active'
+        });
+      }
+
+      // Check if link already exists
+      const existingLink = await base44.asServiceRole.entities.SquareTeamMemberLink.filter({
         user_id: user.id,
-        organization_id: organization_id,
-        square_team_member_id: employee[0].square_team_member_id,
-        link_status: 'linked'
+        organization_id: organization_id
       });
 
-      // Activate user account
-      await base44.auth.updateMe({ account_status: 'active' });
+      if (existingLink.length === 0) {
+        await base44.asServiceRole.entities.SquareTeamMemberLink.create({
+          user_id: user.id,
+          organization_id: organization_id,
+          square_team_member_id: employee[0].square_team_member_id,
+          link_status: 'linked'
+        });
+      }
+
+      // Activate user account with employee role
+      await base44.asServiceRole.entities.User.update(user.id, {
+        role_type: 'employee',
+        account_status: 'active'
+      });
 
       return Response.json({ success: true, linked: true });
     }
@@ -62,24 +79,41 @@ Deno.serve(async (req) => {
       // Single match - auto-link
       const emp = activeEmployees[0];
 
-      // Create membership
-      await base44.asServiceRole.entities.UserOrganizationMembership.create({
+      // Check if membership already exists
+      const existingMembership = await base44.asServiceRole.entities.UserOrganizationMembership.filter({
         user_id: user.id,
-        organization_id: emp.organization_id,
-        membership_role: 'employee',
-        status: 'active'
+        organization_id: emp.organization_id
       });
 
-      // Create Square link
-      await base44.asServiceRole.entities.SquareTeamMemberLink.create({
+      if (existingMembership.length === 0) {
+        await base44.asServiceRole.entities.UserOrganizationMembership.create({
+          user_id: user.id,
+          organization_id: emp.organization_id,
+          membership_role: 'employee',
+          status: 'active'
+        });
+      }
+
+      // Check if link already exists
+      const existingLink = await base44.asServiceRole.entities.SquareTeamMemberLink.filter({
         user_id: user.id,
-        organization_id: emp.organization_id,
-        square_team_member_id: emp.square_team_member_id,
-        link_status: 'linked'
+        organization_id: emp.organization_id
       });
 
-      // Activate user account
-      await base44.auth.updateMe({ account_status: 'active' });
+      if (existingLink.length === 0) {
+        await base44.asServiceRole.entities.SquareTeamMemberLink.create({
+          user_id: user.id,
+          organization_id: emp.organization_id,
+          square_team_member_id: emp.square_team_member_id,
+          link_status: 'linked'
+        });
+      }
+
+      // Activate user account with employee role
+      await base44.asServiceRole.entities.User.update(user.id, {
+        role_type: 'employee',
+        account_status: 'active'
+      });
 
       return Response.json({ success: true, linked: true });
     }
