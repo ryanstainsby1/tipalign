@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import TipTrendChart from '@/components/employee/TipTrendChart';
 export default function EmployeePortal() {
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
+  const queryClient = useQueryClient();
 
   // Get current user and their employee record
   const { data: user } = useQuery({
@@ -37,6 +38,32 @@ export default function EmployeePortal() {
     queryFn: () => base44.entities.Employee.filter({ user_id: user?.id }),
     enabled: !!user,
   });
+
+  // Try to find employee by email if not linked
+  const { data: employeesByEmail = [] } = useQuery({
+    queryKey: ['employeesByEmail', user?.email],
+    queryFn: () => base44.entities.Employee.filter({ email: user?.email }),
+    enabled: !!user && employees.length === 0,
+  });
+
+  const linkEmployeeMutation = useMutation({
+    mutationFn: ({ employeeId, userId }) => 
+      base44.entities.Employee.update(employeeId, { user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+  });
+
+  // Auto-link employee record if found by email
+  useEffect(() => {
+    if (user && employees.length === 0 && employeesByEmail.length > 0 && !linkEmployeeMutation.isPending) {
+      const matchingEmployee = employeesByEmail[0];
+      linkEmployeeMutation.mutate({ 
+        employeeId: matchingEmployee.id, 
+        userId: user.id 
+      });
+    }
+  }, [user, employees, employeesByEmail, linkEmployeeMutation]);
 
   const currentEmployee = employees.length > 0 ? employees[0] : null;
 
@@ -165,9 +192,16 @@ export default function EmployeePortal() {
           <CardContent className="p-8 text-center">
             <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-slate-900 mb-2">Employee Record Not Found</h2>
-            <p className="text-slate-600">
-              Your user account is not linked to an employee record. Please contact your manager to link your account.
+            <p className="text-slate-600 mb-4">
+              {linkEmployeeMutation.isPending 
+                ? 'Linking your account...' 
+                : 'No employee record found with your email address. Please ensure your manager has added you in Square and synced employee data to Tiply.'}
             </p>
+            {linkEmployeeMutation.isPending && (
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
