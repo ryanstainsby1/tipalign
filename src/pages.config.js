@@ -15,6 +15,10 @@ import Exports from './pages/Exports';
 import Ledger from './pages/Ledger';
 import LocationSettings from './pages/LocationSettings';
 import Locations from './pages/Locations';
+import OnboardingConnectSquare from './pages/OnboardingConnectSquare';
+import OnboardingEmployee from './pages/OnboardingEmployee';
+import OnboardingEmployer from './pages/OnboardingEmployer';
+import OnboardingRole from './pages/OnboardingRole';
 import PublicTip from './pages/PublicTip';
 import Reconciliation from './pages/Reconciliation';
 import RulesBuilder from './pages/RulesBuilder';
@@ -24,10 +28,6 @@ import SquareReviewPack from './pages/SquareReviewPack';
 import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
-import OnboardingRole from './pages/OnboardingRole';
-import OnboardingEmployer from './pages/OnboardingEmployer';
-import OnboardingConnectSquare from './pages/OnboardingConnectSquare';
-import OnboardingEmployee from './pages/OnboardingEmployee';
 import __Layout from './Layout.jsx';
 
 
@@ -49,6 +49,10 @@ export const PAGES = {
     "Ledger": Ledger,
     "LocationSettings": LocationSettings,
     "Locations": Locations,
+    "OnboardingConnectSquare": OnboardingConnectSquare,
+    "OnboardingEmployee": OnboardingEmployee,
+    "OnboardingEmployer": OnboardingEmployer,
+    "OnboardingRole": OnboardingRole,
     "PublicTip": PublicTip,
     "Reconciliation": Reconciliation,
     "RulesBuilder": RulesBuilder,
@@ -58,10 +62,6 @@ export const PAGES = {
     "SquareTroubleshoot": SquareTroubleshoot,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
-    "OnboardingRole": OnboardingRole,
-    "OnboardingEmployer": OnboardingEmployer,
-    "OnboardingConnectSquare": OnboardingConnectSquare,
-    "OnboardingEmployee": OnboardingEmployee,
 }
 
 export const pagesConfig = {

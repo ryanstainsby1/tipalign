@@ -23,20 +23,29 @@ export default function OnboardingEmployer() {
     try {
       const user = await base44.auth.me();
       
-      // Check if user already owns an org
+      // Check if user has owner/admin membership
       const memberships = await base44.entities.UserOrganizationMembership.filter({
         user_id: user.id,
-        membership_role: 'owner',
         status: 'active'
       });
 
-      if (memberships.length > 0) {
-        // Already has an org, check if Square is connected
-        const org = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        if (org[0]?.square_merchant_id) {
+      const ownerOrAdminMembership = memberships.find(m => 
+        m.membership_role === 'owner' || m.membership_role === 'admin'
+      );
+
+      if (ownerOrAdminMembership) {
+        // Has org membership, check Square connection
+        const connections = await base44.entities.SquareConnection.filter({
+          organization_id: ownerOrAdminMembership.organization_id,
+          connection_status: 'connected'
+        });
+
+        if (connections.length > 0) {
+          // Has active Square connection - go to dashboard
           navigate(createPageUrl('Dashboard'));
           return;
         }
+        
         // Has org but no Square - go to connect step
         navigate(createPageUrl('OnboardingConnectSquare'));
         return;

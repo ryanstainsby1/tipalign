@@ -83,8 +83,21 @@ export default function Layout({ children, currentPageName }) {
             membership_role: ['owner', 'admin'],
             status: 'active'
           });
+
           if (memberships.length === 0) {
             navigate(createPageUrl('OnboardingRole'));
+            return;
+          }
+
+          // Verify Square connection exists
+          const connections = await base44.entities.SquareConnection.filter({
+            organization_id: memberships[0].organization_id,
+            connection_status: 'connected'
+          });
+
+          if (connections.length === 0) {
+            navigate(createPageUrl('OnboardingConnectSquare'));
+            return;
           }
         }
 
