@@ -49,12 +49,20 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
-    // Get user's organization from membership
-    const memberships = await base44.entities.UserOrganizationMembership.filter({
+    // Get user's organization from membership - check each role separately
+    const ownerMemberships = await base44.entities.UserOrganizationMembership.filter({
       user_id: user.id,
-      membership_role: ['owner', 'admin'],
+      membership_role: 'owner',
       status: 'active'
     });
+
+    const adminMemberships = await base44.entities.UserOrganizationMembership.filter({
+      user_id: user.id,
+      membership_role: 'admin',
+      status: 'active'
+    });
+
+    const memberships = [...ownerMemberships, ...adminMemberships];
 
     if (memberships.length === 0) {
       return Response.json({ 
