@@ -257,10 +257,32 @@ Deno.serve(async (req) => {
       console.error('Entity count failed:', countError);
     }
 
+    // Update organization with Square merchant ID
+    try {
+      const memberships = await base44.asServiceRole.entities.UserOrganizationMembership.filter({
+        organization_id: stateData.org_id,
+        membership_role: 'owner'
+      });
+
+      if (memberships.length > 0) {
+        await base44.asServiceRole.entities.Organization.update(stateData.org_id, {
+          square_merchant_id: merchantId
+        });
+
+        // Set owner as active
+        await base44.asServiceRole.entities.User.update(memberships[0].user_id, {
+          account_status: 'active'
+        });
+      }
+    } catch (updateError) {
+      console.error('Failed to update organization:', updateError);
+    }
+
     const callbackDuration = Date.now() - callbackStartTime;
     console.log(`Callback completed in ${callbackDuration}ms`);
     
-    // Redirect to dashboard with success
+    // Redirect to onboarding complete or dashboard
+    const redirectPage = 'OnboardingConnectSquare';
     const params = new URLSearchParams({
       square_connected: '1',
       merchant: merchantName,
@@ -269,7 +291,7 @@ Deno.serve(async (req) => {
       staff_synced: staffCount.toString()
     });
     
-    const redirectUrl = `${origin}/Dashboard?${params.toString()}`;
+    const redirectUrl = `${origin}/${redirectPage}?${params.toString()}`;
     console.log('Redirecting to:', redirectUrl);
     
     // Return HTML with success message and auto-redirect

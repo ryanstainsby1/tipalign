@@ -100,7 +100,8 @@ Deno.serve(async (req) => {
     console.log('OAuth redirect prepared:', {
       callback_url: callbackUrl,
       environment: SQUARE_ENVIRONMENT,
-      state_length: state.length
+      state_length: state.length,
+      org_id: stateData.org_id
     });
 
     return Response.json({ 

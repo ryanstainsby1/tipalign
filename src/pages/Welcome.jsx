@@ -74,24 +74,10 @@ export default function Welcome() {
         throw new Error('Login failed after registration');
       }
 
-      // Create organization record
-      await base44.entities.Organization.create({
-        name: formData.businessName,
-        primary_contact_name: formData.contactName,
-        primary_contact_email: formData.email,
-        primary_contact_phone: formData.phone,
-        subscription_tier: 'trial',
-        subscription_status: 'active',
-        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        settings: {
-          currency: 'GBP',
-          auto_sync_enabled: true,
-          sync_frequency: 'daily'
-        }
-      });
-
-      toast.success('Account created! Connect your Square account to get started.');
-      navigate(createPageUrl('Dashboard'));
+      toast.success('Welcome to Tiply! 🎉');
+      
+      // Redirect to onboarding
+      navigate(createPageUrl('OnboardingRole'));
     } catch (error) {
       toast.error(error.message || 'Failed to create account');
       setLoading(false);
