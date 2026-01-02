@@ -49,19 +49,6 @@ Deno.serve(async (req) => {
     const state = btoa(JSON.stringify(stateData)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     console.log('State created, length:', state.length);
 
-    // Log state
-    await base44.asServiceRole.entities.SystemAuditEvent.create({
-      organization_id: orgId,
-      event_type: 'square_connect_started',
-      actor_type: 'user',
-      actor_user_id: user.id,
-      entity_type: 'square_connection',
-      changes_summary: 'OAuth started',
-      severity: 'info',
-      after_snapshot: { state_token: state, expires_at: new Date(Date.now() + 600000).toISOString() }
-    });
-    console.log('Audit log created');
-
     const authUrl = SQUARE_ENVIRONMENT === 'production' 
       ? 'https://connect.squareup.com/oauth2/authorize'
       : 'https://connect.squareupsandbox.com/oauth2/authorize';
