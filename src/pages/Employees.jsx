@@ -18,7 +18,14 @@ export default function Employees() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [viewingHistory, setViewingHistory] = useState(null);
   const [viewingWallet, setViewingWallet] = useState(null);
+  const [addingEmployee, setAddingEmployee] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [addForm, setAddForm] = useState({
+    full_name: '',
+    email: '',
+    role: 'server',
+    role_weight: 1.0
+  });
 
   const queryClient = useQueryClient();
 
@@ -42,11 +49,30 @@ export default function Employees() {
     enabled: !!viewingWallet,
   });
 
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Employee.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setEditingEmployee(null);
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data) => base44.entities.Employee.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setAddingEmployee(false);
+      setAddForm({
+        full_name: '',
+        email: '',
+        role: 'server',
+        role_weight: 1.0
+      });
     },
   });
 
@@ -73,6 +99,15 @@ export default function Employees() {
     });
   };
 
+  const handleAddEmployee = () => {
+    createMutation.mutate({
+      ...addForm,
+      organization_id: user?.organization_id || user?.id,
+      square_team_member_id: `manual_${Date.now()}`,
+      employment_status: 'active'
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -87,7 +122,10 @@ export default function Employees() {
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
-            <Button className="bg-indigo-600 hover:bg-indigo-700">
+            <Button 
+              onClick={() => setAddingEmployee(true)}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Employee
             </Button>
@@ -132,6 +170,71 @@ export default function Employees() {
             onViewWallet={(emp) => setViewingWallet(emp)}
           />
         )}
+
+        {/* Add Employee Dialog */}
+        <Dialog open={addingEmployee} onOpenChange={() => setAddingEmployee(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Employee</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Full Name *</Label>
+                <Input
+                  value={addForm.full_name}
+                  onChange={(e) => setAddForm(f => ({ ...f, full_name: e.target.value }))}
+                  placeholder="John Smith"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={addForm.email}
+                  onChange={(e) => setAddForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Role *</Label>
+                <Select value={addForm.role} onValueChange={(v) => setAddForm(f => ({ ...f, role: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="server">Server</SelectItem>
+                    <SelectItem value="bartender">Bartender</SelectItem>
+                    <SelectItem value="host">Host</SelectItem>
+                    <SelectItem value="kitchen">Kitchen</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="runner">Runner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tip Weight Multiplier</Label>
+                <Input
+                  type="number"
+                  step="0.25"
+                  min="0.25"
+                  max="2"
+                  value={addForm.role_weight}
+                  onChange={(e) => setAddForm(f => ({ ...f, role_weight: parseFloat(e.target.value) }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddingEmployee(false)}>Cancel</Button>
+              <Button 
+                onClick={handleAddEmployee}
+                disabled={!addForm.full_name || createMutation.isPending}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                {createMutation.isPending ? 'Adding...' : 'Add Employee'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Dialog */}
         <Dialog open={!!editingEmployee} onOpenChange={() => setEditingEmployee(null)}>
