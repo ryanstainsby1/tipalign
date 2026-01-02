@@ -24,6 +24,10 @@ import SquareReviewPack from './pages/SquareReviewPack';
 import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
+import OnboardingRole from './pages/OnboardingRole';
+import OnboardingEmployer from './pages/OnboardingEmployer';
+import OnboardingConnectSquare from './pages/OnboardingConnectSquare';
+import OnboardingEmployee from './pages/OnboardingEmployee';
 import __Layout from './Layout.jsx';
 
 
@@ -54,6 +58,10 @@ export const PAGES = {
     "SquareTroubleshoot": SquareTroubleshoot,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
+    "OnboardingRole": OnboardingRole,
+    "OnboardingEmployer": OnboardingEmployer,
+    "OnboardingConnectSquare": OnboardingConnectSquare,
+    "OnboardingEmployee": OnboardingEmployee,
 }
 
 export const pagesConfig = {
