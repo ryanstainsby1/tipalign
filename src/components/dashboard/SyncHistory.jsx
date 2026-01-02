@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, AlertTriangle, XCircle, Clock, RefreshCw } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export default function SyncHistory({ syncJobs = [] }) {
   const getStatusIcon = (status) => {
