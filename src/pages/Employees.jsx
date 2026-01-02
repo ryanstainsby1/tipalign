@@ -22,9 +22,20 @@ export default function Employees() {
 
   const queryClient = useQueryClient();
 
+  const { data: currentOrg } = useQuery({
+    queryKey: ['currentOrganization'],
+    queryFn: async () => {
+      const response = await base44.functions.invoke('getCurrentOrganization', {});
+      return response.data.success ? response.data.organization : null;
+    },
+  });
+
   const { data: employees = [], isLoading } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => base44.entities.Employee.list(),
+    queryKey: ['employees', currentOrg?.id],
+    queryFn: () => base44.entities.Employee.filter({
+      organization_id: currentOrg?.id
+    }),
+    enabled: !!currentOrg?.id,
   });
 
   const { data: allocations = [] } = useQuery({

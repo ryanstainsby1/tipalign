@@ -61,37 +61,57 @@ export default function Dashboard() {
     }
   }, [queryClient]);
 
+  const { data: currentOrg } = useQuery({
+    queryKey: ['currentOrganization'],
+    queryFn: async () => {
+      const response = await base44.functions.invoke('getCurrentOrganization', {});
+      return response.data.success ? response.data.organization : null;
+    },
+  });
+
+  const organizationId = currentOrg?.id;
+
   const { data: transactions = [] } = useQuery({
-    queryKey: ['transactions'],
-    queryFn: () => base44.entities.Transaction.list('-transaction_date', 100),
+    queryKey: ['transactions', organizationId],
+    queryFn: () => base44.entities.Transaction.filter({ organization_id: organizationId }),
+    enabled: !!organizationId,
   });
 
   const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees', organizationId],
     queryFn: async () => {
-      const allEmployees = await base44.entities.Employee.filter({ employment_status: 'active' });
+      const allEmployees = await base44.entities.Employee.filter({ 
+        organization_id: organizationId,
+        employment_status: 'active' 
+      });
       return allEmployees.filter(emp => !emp.removed_from_square_at);
     },
+    enabled: !!organizationId,
   });
 
   const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
-    queryFn: () => base44.entities.Location.filter({ active: true }),
+    queryKey: ['locations', organizationId],
+    queryFn: () => base44.entities.Location.filter({ 
+      organization_id: organizationId,
+      active: true 
+    }),
+    enabled: !!organizationId,
   });
 
   const { data: allocations = [] } = useQuery({
-    queryKey: ['allocations'],
-    queryFn: () => base44.entities.TipAllocation.list('-allocation_date', 500),
+    queryKey: ['allocations', organizationId],
+    queryFn: () => base44.entities.TipAllocation.filter({ 
+      organization_id: organizationId 
+    }),
+    enabled: !!organizationId,
   });
 
   const { data: squareConnections = [], isLoading: loadingConnection } = useQuery({
-    queryKey: ['squareConnection'],
-    queryFn: async () => {
-      const user = await base44.auth.me();
-      return await base44.entities.SquareConnection.filter({
-        organization_id: user.organization_id || user.id
-      });
-    },
+    queryKey: ['squareConnection', organizationId],
+    queryFn: () => base44.entities.SquareConnection.filter({
+      organization_id: organizationId
+    }),
+    enabled: !!organizationId,
   });
 
   const squareConnection = squareConnections.find(c => c.connection_status === 'connected');
@@ -129,21 +149,22 @@ export default function Dashboard() {
   });
 
   const { data: dailySummaries = [], isLoading: loadingSummaries } = useQuery({
-    queryKey: ['dailySummaries', dateRange],
+    queryKey: ['dailySummaries', organizationId, dateRange],
     queryFn: async () => {
-      const user = await base44.auth.me();
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - dateRange);
       
-      const summaries = await base44.entities.DailyRevenueSummary.list('-business_date', 500);
+      const summaries = await base44.entities.DailyRevenueSummary.filter({
+        organization_id: organizationId
+      });
       
       return summaries.filter(s => {
         const date = new Date(s.business_date);
         return date >= startDate && date <= endDate;
       }).sort((a, b) => new Date(a.business_date) - new Date(b.business_date));
     },
-    enabled: !!squareConnection,
+    enabled: !!organizationId && !!squareConnection,
   });
 
   const { data: webhookLogs = [] } = useQuery({

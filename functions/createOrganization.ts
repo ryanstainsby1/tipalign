@@ -45,7 +45,10 @@ Deno.serve(async (req) => {
     });
 
     // Keep user in pending_setup until Square is connected
-    await base44.auth.updateMe({ account_status: 'pending_setup' });
+    await base44.auth.updateMe({ 
+      account_status: 'pending_setup',
+      organization_id: organization.id  // Legacy field for backwards compatibility
+    });
 
     return Response.json({
       success: true,

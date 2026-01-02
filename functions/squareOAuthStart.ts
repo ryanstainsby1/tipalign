@@ -49,10 +49,26 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
+    // Get user's organization from membership
+    const memberships = await base44.entities.UserOrganizationMembership.filter({
+      user_id: user.id,
+      membership_role: ['owner', 'admin'],
+      status: 'active'
+    });
+
+    if (memberships.length === 0) {
+      return Response.json({ 
+        success: false, 
+        error: 'No organization membership found. Please complete onboarding first.' 
+      }, { status: 400 });
+    }
+
+    const orgId = memberships[0].organization_id;
+
     // Generate secure state token
     const stateData = {
       user_id: user.id,
-      org_id: user.organization_id || user.id,
+      org_id: orgId,
       timestamp: Date.now(),
       nonce: crypto.randomUUID()
     };
