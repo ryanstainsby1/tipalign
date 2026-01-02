@@ -54,7 +54,8 @@ export default function Employees() {
     const matchesSearch = emp.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           emp.email?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = roleFilter === 'all' || emp.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const notRemovedFromSquare = !emp.removed_from_square_at;
+    return matchesSearch && matchesRole && notRemovedFromSquare;
   });
 
   const handleEdit = (employee) => {
