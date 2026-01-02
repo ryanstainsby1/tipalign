@@ -1,6 +1,8 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
+  console.log('=== SQUARE CALLBACK INVOKED ===', req.url);
+  
   const url = new URL(req.url);
   const origin = url.origin;
 
@@ -9,13 +11,20 @@ Deno.serve(async (req) => {
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
+    
+    // Check if neither code nor error is present
+    if (!code && !error) {
+      console.error('Square OAuth callback without code or error', req.url);
+      return Response.redirect(`${origin}/Welcome?error=no_code_received`, 302);
+    }
 
-    if (error) return Response.redirect(`${origin}/Dashboard?error=${error}`, 302);
-    if (!code || !state) return Response.redirect(`${origin}/Dashboard?error=missing_params`, 302);
+    if (error) return Response.redirect(`${origin}/Welcome?error=${error}`, 302);
+    if (!code || !state) return Response.redirect(`${origin}/Welcome?error=missing_params`, 302);
 
     const stateData = JSON.parse(atob(state.replace(/-/g, '+').replace(/_/g, '/')));
     if (Date.now() - stateData.timestamp > 600000) {
-      return Response.redirect(`${origin}/Dashboard?error=expired`, 302);
+      console.error('State token expired');
+      return Response.redirect(`${origin}/Welcome?error=state_expired`, 302);
     }
 
     const SQUARE_APP_ID = Deno.env.get('SQUARE_APP_ID');
@@ -33,12 +42,15 @@ Deno.serve(async (req) => {
         client_id: SQUARE_APP_ID,
         client_secret: SQUARE_APP_SECRET,
         code: code,
-        grant_type: 'authorization_code'
+        grant_type: 'authorization_code',
+        redirect_uri: 'https://tip-align-29fe435b.base44.app/functions/squareCallback'
       })
     });
 
     if (!tokenRes.ok) {
-      return Response.redirect(`${origin}/Dashboard?error=token_failed`, 302);
+      const errorData = await tokenRes.json().catch(() => ({}));
+      console.error('Square token exchange failed:', tokenRes.status, errorData);
+      return Response.redirect(`${origin}/Welcome?error=token_exchange_failed&status=${tokenRes.status}`, 302);
     }
 
     const tokenData = await tokenRes.json();
@@ -100,6 +112,6 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Callback error:', error);
-    return Response.redirect(`${origin}/Dashboard?error=failed`, 302);
+    return Response.redirect(`${origin}/Welcome?error=callback_failed&message=${encodeURIComponent(error.message)}`, 302);
   }
 });
