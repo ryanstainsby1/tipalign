@@ -68,7 +68,10 @@ export default function Dashboard() {
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
-    queryFn: () => base44.entities.Employee.filter({ employment_status: 'active' }),
+    queryFn: async () => {
+      const allEmployees = await base44.entities.Employee.filter({ employment_status: 'active' });
+      return allEmployees.filter(emp => !emp.removed_from_square_at);
+    },
   });
 
   const { data: locations = [] } = useQuery({
