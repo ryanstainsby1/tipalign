@@ -257,25 +257,25 @@ Deno.serve(async (req) => {
       console.error('Entity count failed:', countError);
     }
 
-    // Update organization with Square merchant ID and activate user
+    // Update organization with Square merchant ID
     try {
-      await base44.asServiceRole.entities.Organization.update(stateData.org_id, {
-        square_merchant_id: merchantId
+      const memberships = await base44.asServiceRole.entities.UserOrganizationMembership.filter({
+        organization_id: stateData.org_id,
+        membership_role: 'owner'
       });
 
-      // Set connecting user as active
-      const userUpdates = await base44.asServiceRole.entities.User.filter({
-        id: stateData.user_id
-      });
-      
-      if (userUpdates.length > 0) {
-        await base44.asServiceRole.entities.User.update(stateData.user_id, {
+      if (memberships.length > 0) {
+        await base44.asServiceRole.entities.Organization.update(stateData.org_id, {
+          square_merchant_id: merchantId
+        });
+
+        // Set owner as active
+        await base44.asServiceRole.entities.User.update(memberships[0].user_id, {
           account_status: 'active'
         });
-        console.log('User account activated:', stateData.user_id);
       }
     } catch (updateError) {
-      console.error('Failed to update organization/user:', updateError);
+      console.error('Failed to update organization:', updateError);
     }
 
     const callbackDuration = Date.now() - callbackStartTime;
