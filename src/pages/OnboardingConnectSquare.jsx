@@ -52,7 +52,9 @@ export default function OnboardingConnectSquare() {
   const handleConnectSquare = async () => {
     setConnecting(true);
     try {
-      const response = await base44.functions.invoke('squareOAuthStart', {});
+      const response = await base44.functions.invoke('squareOAuthStart', {
+        from_onboarding: true
+      });
       if (response.data.success && response.data.redirect_url) {
         window.location.href = response.data.redirect_url;
       } else {

@@ -61,23 +61,48 @@ export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkUserRole = async () => {
+    const checkUserAccess = async () => {
       try {
         const user = await base44.auth.me();
         setCurrentUser(user);
-        
-        // Redirect staff users away from admin pages
+
+        // Force onboarding if not set up
+        if (user.account_status === 'pending_setup' || user.role_type === 'unassigned') {
+          if (!['OnboardingRole', 'OnboardingEmployer', 'OnboardingEmployee', 'OnboardingConnectSquare'].includes(currentPageName)) {
+            navigate(createPageUrl('OnboardingRole'));
+            return;
+          }
+        }
+
         const adminPages = ['Dashboard', 'Allocations', 'Locations', 'Employees', 'Compliance', 'Reconciliation', 'Settings', 'ButtonWiringChecklist', 'SmokeTest'];
         
-        if (user.role === 'user' && adminPages.includes(currentPageName)) {
+        // Employer access control
+        if (user.role_type === 'employer' && adminPages.includes(currentPageName)) {
+          const memberships = await base44.entities.UserOrganizationMembership.filter({
+            user_id: user.id,
+            membership_role: ['owner', 'admin'],
+            status: 'active'
+          });
+          if (memberships.length === 0) {
+            navigate(createPageUrl('OnboardingRole'));
+          }
+        }
+
+        // Employee access control
+        if (user.role_type === 'employee' && adminPages.includes(currentPageName)) {
           navigate(createPageUrl('EmployeePortal'));
         }
+
+        // Block employee portal for non-employees
+        if (currentPageName === 'EmployeePortal' && user.role_type !== 'employee') {
+          navigate(createPageUrl('Dashboard'));
+        }
       } catch (error) {
-        console.error('Failed to check user role:', error);
+        console.error('Failed to check user access:', error);
       }
     };
     
-    checkUserRole();
+    checkUserAccess();
   }, [currentPageName, navigate]);
 
   const handleLogout = () => {
@@ -116,8 +141,8 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-6 overflow-y-auto">
-            {currentUser?.role === 'user' ? (
-              // Staff user - only show Employee Portal
+            {currentUser?.role_type === 'employee' ? (
+              // Employee - only show Employee Portal
               <div className="space-y-1">
                 <Link
                   to={createPageUrl('EmployeePortal')}
