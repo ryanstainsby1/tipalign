@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000001';
 const DEMO_USER_EMAIL = 'demo@tiply.app';
+const DEMO_USER_EMAILS = ['demo@tiply.app', 'demo.employer@tiply.app', 'demo.employee@tiply.app'];
 
 Deno.serve(async (req) => {
   try {
@@ -71,10 +72,39 @@ Deno.serve(async (req) => {
 
     await Promise.all(updates);
 
+    // Mark demo users with is_demo flag
+    const allUsers = await base44.asServiceRole.entities.User.list();
+    const demoUsers = allUsers.filter(u => DEMO_USER_EMAILS.includes(u.email.toLowerCase()));
+    
+    for (const demoUser of demoUsers) {
+      await base44.asServiceRole.entities.User.update(demoUser.id, {
+        is_demo: true,
+        account_status: 'active'
+      });
+    }
+
+    // Ensure demo users have membership
+    for (const demoUser of demoUsers) {
+      const memberships = await base44.asServiceRole.entities.UserOrganizationMembership.filter({
+        user_id: demoUser.id,
+        organization_id: DEMO_ORG_ID
+      });
+
+      if (memberships.length === 0) {
+        await base44.asServiceRole.entities.UserOrganizationMembership.create({
+          user_id: demoUser.id,
+          organization_id: DEMO_ORG_ID,
+          membership_role: demoUser.email === 'demo.employee@tiply.app' ? 'employee' : 'owner',
+          status: 'active'
+        });
+      }
+    }
+
     return Response.json({
       success: true,
       demo_org_id: DEMO_ORG_ID,
       updated_records: updates.length,
+      demo_users_marked: demoUsers.length,
       message: 'Demo org seeded successfully'
     });
 

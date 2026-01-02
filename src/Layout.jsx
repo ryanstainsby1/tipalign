@@ -66,6 +66,23 @@ export default function Layout({ children, currentPageName }) {
         const user = await base44.auth.me();
         setCurrentUser(user);
 
+        const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000001';
+
+        // Demo user access restriction
+        if (user.is_demo) {
+          const demoMemberships = await base44.entities.UserOrganizationMembership.filter({
+            user_id: user.id,
+            organization_id: DEMO_ORG_ID,
+            status: 'active'
+          });
+
+          if (demoMemberships.length === 0) {
+            // Demo user without demo org access
+            navigate(createPageUrl('OnboardingRole'));
+            return;
+          }
+        }
+
         // Force onboarding if not set up
         if (user.account_status === 'pending_setup' || user.role_type === 'unassigned') {
           if (!['OnboardingRole', 'OnboardingEmployer', 'OnboardingEmployee', 'OnboardingConnectSquare'].includes(currentPageName)) {
