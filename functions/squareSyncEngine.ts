@@ -121,9 +121,33 @@ async function syncTeamMembers(base44, connection, orgId) {
   const watermark = await getWatermark(base44, orgId, connection.id, 'team_members');
   const data = await squareApiCall('/v2/team-members?status=ACTIVE,INACTIVE', connection.square_access_token_encrypted);
   
-  let created = 0, updated = 0;
+  let created = 0, updated = 0, removed = 0;
   const errors = [];
 
+  // Get list of Square team member IDs from API
+  const squareTeamMemberIds = (data.team_members || []).map(tm => tm.id);
+
+  // Get all existing employees for this organization
+  const existingEmployees = await base44.asServiceRole.entities.Employee.filter({
+    organization_id: orgId
+  });
+
+  // Mark employees as removed if they're no longer in Square
+  for (const employee of existingEmployees) {
+    if (employee.square_team_member_id && !squareTeamMemberIds.includes(employee.square_team_member_id)) {
+      try {
+        await base44.asServiceRole.entities.Employee.update(employee.id, {
+          removed_from_square_at: new Date().toISOString(),
+          employment_status: 'terminated'
+        });
+        removed++;
+      } catch (error) {
+        errors.push({ entity_type: 'team_member', square_id: employee.square_team_member_id, error_message: `Failed to mark as removed: ${error.message}` });
+      }
+    }
+  }
+
+  // Sync/create employees from Square
   for (const tm of data.team_members || []) {
     try {
       const existing = await base44.asServiceRole.entities.Employee.filter({
@@ -139,7 +163,8 @@ async function syncTeamMembers(base44, connection, orgId) {
         phone: tm.phone_number || '',
         employment_status: tm.status === 'ACTIVE' ? 'active' : 'terminated',
         role: existing.length > 0 ? existing[0].role : 'server',
-        role_weight: existing.length > 0 ? existing[0].role_weight : 1.0
+        role_weight: existing.length > 0 ? existing[0].role_weight : 1.0,
+        removed_from_square_at: null  // Clear removal flag if employee is back
       };
 
       if (existing.length > 0) {
@@ -155,7 +180,7 @@ async function syncTeamMembers(base44, connection, orgId) {
   }
 
   await updateWatermark(base44, watermark.id, null, created + updated);
-  return { created, updated, errors };
+  return { created, updated, removed, errors };
 }
 
 // Sync Shifts for a location
