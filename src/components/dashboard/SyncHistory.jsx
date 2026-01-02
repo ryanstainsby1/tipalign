@@ -10,6 +10,12 @@ import {
 } from "@/components/ui/collapsible";
 
 export default function SyncHistory({ syncJobs = [] }) {
+  const [expandedJobs, setExpandedJobs] = useState({});
+
+  const toggleExpanded = (jobId) => {
+    setExpandedJobs(prev => ({ ...prev, [jobId]: !prev[jobId] }));
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
