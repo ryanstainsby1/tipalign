@@ -124,17 +124,29 @@ async function syncTeamMembers(base44, connection, orgId) {
   let created = 0, updated = 0, removed = 0;
   const errors = [];
 
-  // Get list of Square team member IDs from API
+  // Get list of Square team member IDs and emails from API
   const squareTeamMemberIds = (data.team_members || []).map(tm => tm.id);
+  const squareTeamMemberEmails = (data.team_members || [])
+    .map(tm => tm.email_address?.toLowerCase())
+    .filter(Boolean);
 
-  // Get all existing employees for this organization
+  // Get all existing employees for this organization (excluding already removed)
   const existingEmployees = await base44.asServiceRole.entities.Employee.filter({
     organization_id: orgId
   });
 
   // Mark employees as removed if they're no longer in Square
   for (const employee of existingEmployees) {
-    if (employee.square_team_member_id && !squareTeamMemberIds.includes(employee.square_team_member_id)) {
+    // Skip if already marked as removed
+    if (employee.removed_from_square_at) continue;
+
+    const shouldRemove = 
+      // Has a Square ID that's not in Square anymore
+      (employee.square_team_member_id && !squareTeamMemberIds.includes(employee.square_team_member_id)) ||
+      // Or doesn't have a Square ID at all (manual addition) and email doesn't match anyone in Square
+      (!employee.square_team_member_id && employee.email && !squareTeamMemberEmails.includes(employee.email.toLowerCase()));
+
+    if (shouldRemove) {
       try {
         await base44.asServiceRole.entities.Employee.update(employee.id, {
           removed_from_square_at: new Date().toISOString(),
@@ -142,7 +154,7 @@ async function syncTeamMembers(base44, connection, orgId) {
         });
         removed++;
       } catch (error) {
-        errors.push({ entity_type: 'team_member', square_id: employee.square_team_member_id, error_message: `Failed to mark as removed: ${error.message}` });
+        errors.push({ entity_type: 'team_member', square_id: employee.square_team_member_id || employee.email, error_message: `Failed to mark as removed: ${error.message}` });
       }
     }
   }
