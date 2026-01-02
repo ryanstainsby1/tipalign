@@ -102,8 +102,24 @@ export default function Layout({ children, currentPageName }) {
         }
 
         // Employee access control
-        if (user.role_type === 'employee' && adminPages.includes(currentPageName)) {
-          navigate(createPageUrl('EmployeePortal'));
+        if (user.role_type === 'employee') {
+          // Verify employee has valid Square team member link
+          const teamLinks = await base44.entities.SquareTeamMemberLink.filter({
+            user_id: user.id,
+            link_status: 'linked'
+          });
+
+          if (teamLinks.length === 0) {
+            // No valid link - redirect to employee onboarding
+            if (currentPageName !== 'OnboardingEmployee') {
+              navigate(createPageUrl('OnboardingEmployee'));
+              return;
+            }
+          } else if (adminPages.includes(currentPageName)) {
+            // Employee trying to access admin pages - redirect to portal
+            navigate(createPageUrl('EmployeePortal'));
+            return;
+          }
         }
 
         // Block employee portal for non-employees
