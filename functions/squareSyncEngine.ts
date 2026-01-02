@@ -343,9 +343,21 @@ Deno.serve(async (req) => {
 
     const { connection_id, entity_types = ['locations', 'team_members', 'shifts', 'payments'] } = await req.json();
 
+    // Get user's organization from membership
+    const memberships = await base44.entities.UserOrganizationMembership.filter({
+      user_id: user.id,
+      status: 'active'
+    });
+
+    if (memberships.length === 0) {
+      return Response.json({ error: 'No organization membership found' }, { status: 400 });
+    }
+
+    const orgId = memberships[0].organization_id;
+
     const connections = await base44.asServiceRole.entities.SquareConnection.filter({
       id: connection_id,
-      organization_id: user.organization_id || user.id
+      organization_id: orgId
     });
 
     if (connections.length === 0) {
