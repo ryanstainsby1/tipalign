@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
 
     const authUrl = `${baseAuth}?${params.toString()}`;
 
-    return Response.json({ success: true, auth_url: authUrl });
+    return Response.json({ success: true, redirect_url: authUrl });
 
   } catch (error) {
     console.error('Start Square Connect error:', error);
