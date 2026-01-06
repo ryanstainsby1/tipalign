@@ -27,7 +27,14 @@ export default function Welcome() {
       try {
         const isAuth = await base44.auth.isAuthenticated();
         if (isAuth) {
-          navigate(createPageUrl('Dashboard'));
+          const user = await base44.auth.me();
+          
+          // Redirect to onboarding if user hasn't completed setup
+          if (user.account_status === 'pending_setup' || user.role_type === 'unassigned' || !user.role_type) {
+            navigate(createPageUrl('OnboardingRole'));
+          } else {
+            navigate(createPageUrl('Dashboard'));
+          }
         }
       } catch (error) {
         // Not authenticated, stay on signup page
@@ -135,7 +142,7 @@ export default function Welcome() {
                   type="button"
                   variant="outline"
                   className="w-full h-12 text-base border-2 hover:bg-slate-50"
-                  onClick={() => base44.auth.redirectToLogin(createPageUrl('Welcome'))}
+                  onClick={() => base44.auth.redirectToLogin(createPageUrl('OnboardingRole'))}
                 >
                   <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
