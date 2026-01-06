@@ -66,82 +66,16 @@ export default function Layout({ children, currentPageName }) {
         const user = await base44.auth.me();
         setCurrentUser(user);
 
-        const DEMO_ORG_ID = '00000000-0000-0000-0000-000000000001';
+        // Check if user has an organization
+        const memberships = await base44.entities.UserOrganizationMembership.filter({
+          user_id: user.id,
+          status: 'active'
+        });
 
-        // Demo user access restriction
-        if (user.is_demo) {
-          const demoMemberships = await base44.entities.UserOrganizationMembership.filter({
-            user_id: user.id,
-            organization_id: DEMO_ORG_ID,
-            status: 'active'
-          });
-
-          if (demoMemberships.length === 0) {
-            // Demo user without demo org access
-            navigate(createPageUrl('OnboardingRole'));
-            return;
-          }
-        }
-
-        // Force onboarding if not set up
-        if (user.account_status === 'pending_setup' || user.role_type === 'unassigned') {
-          if (!['OnboardingRole', 'OnboardingEmployer', 'OnboardingEmployee', 'OnboardingConnectSquare'].includes(currentPageName)) {
-            navigate(createPageUrl('OnboardingRole'));
-            return;
-          }
-        }
-
-        const adminPages = ['Dashboard', 'Allocations', 'Locations', 'Employees', 'Compliance', 'Reconciliation', 'Settings', 'ButtonWiringChecklist', 'SmokeTest'];
-        
-        // Employer access control
-        if (user.role_type === 'employer' && adminPages.includes(currentPageName)) {
-          const memberships = await base44.entities.UserOrganizationMembership.filter({
-            user_id: user.id,
-            membership_role: ['owner', 'admin'],
-            status: 'active'
-          });
-
-          if (memberships.length === 0) {
-            navigate(createPageUrl('OnboardingRole'));
-            return;
-          }
-
-          // Verify Square connection exists
-          const connections = await base44.entities.SquareConnection.filter({
-            organization_id: memberships[0].organization_id,
-            connection_status: 'connected'
-          });
-
-          if (connections.length === 0) {
-            navigate(createPageUrl('OnboardingConnectSquare'));
-            return;
-          }
-        }
-
-        // Employee access control
-        if (user.role_type === 'employee') {
-          // Verify employee has valid Square team member link
-          const teamLinks = await base44.entities.SquareTeamMemberLink.filter({
-            user_id: user.id,
-            link_status: 'linked'
-          });
-
-          if (teamLinks.length === 0) {
-            // No valid link - redirect to employee onboarding
-            if (currentPageName !== 'OnboardingEmployee') {
-              navigate(createPageUrl('OnboardingEmployee'));
-              return;
-            }
-          } else if (adminPages.includes(currentPageName)) {
-            // Employee trying to access admin pages - redirect to portal
-            navigate(createPageUrl('EmployeePortal'));
-            return;
-          }
-        }
-
-        // Block employee portal for non-employees
-        if (currentPageName === 'EmployeePortal' && user.role_type !== 'employee') {
-          navigate(createPageUrl('Dashboard'));
+        // If no organization, redirect to create one
+        if (memberships.length === 0 && currentPageName !== 'Welcome') {
+          navigate(createPageUrl('Welcome'));
+          return;
         }
       } catch (error) {
         console.error('Failed to check user access:', error);
@@ -187,22 +121,6 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-6 overflow-y-auto">
-            {currentUser?.role_type === 'employee' ? (
-              // Employee - only show Employee Portal
-              <div className="space-y-1">
-                <Link
-                  to={createPageUrl('EmployeePortal')}
-                  onClick={() => setSidebarOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-blue-50 text-indigo-600 font-semibold"
-                >
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600 rounded-r-full" />
-                  <User className="w-5 h-5 text-indigo-600" />
-                  My Tips
-                </Link>
-              </div>
-            ) : (
-              // Admin/Manager - show full navigation
-              <>
             {navigationSections.map((section, sectionIndex) => (
               <div key={section.label} className={sectionIndex > 0 ? 'mt-6' : ''}>
                 {/* Section Label */}
@@ -248,8 +166,8 @@ export default function Layout({ children, currentPageName }) {
                 )}
                 </div>
                 ))}
-                </>
-                )}
+                </div>
+                ))}
                 </nav>
 
 

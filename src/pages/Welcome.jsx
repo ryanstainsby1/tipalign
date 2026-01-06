@@ -21,18 +21,19 @@ export default function Welcome() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const navigate = useNavigate();
 
-  // Check if user is already logged in
+  // Check if user is already logged in and has organization
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const isAuth = await base44.auth.isAuthenticated();
         if (isAuth) {
           const user = await base44.auth.me();
+          const memberships = await base44.entities.UserOrganizationMembership.filter({
+            user_id: user.id,
+            status: 'active'
+          });
           
-          // Redirect to onboarding if user hasn't completed setup
-          if (user.account_status === 'pending_setup' || user.role_type === 'unassigned' || !user.role_type) {
-            navigate(createPageUrl('OnboardingRole'));
-          } else {
+          if (memberships.length > 0) {
             navigate(createPageUrl('Dashboard'));
           }
         }
@@ -81,10 +82,19 @@ export default function Welcome() {
         throw new Error('Login failed after registration');
       }
 
+      // Create organization for the user
+      const orgResponse = await base44.functions.invoke('createOrganization', {
+        name: formData.businessName
+      });
+
+      if (!orgResponse.data.success) {
+        throw new Error('Failed to create organization');
+      }
+
       toast.success('Welcome to Tiply! 🎉');
       
-      // Redirect to onboarding
-      navigate(createPageUrl('OnboardingRole'));
+      // Redirect to dashboard
+      navigate(createPageUrl('Dashboard'));
     } catch (error) {
       toast.error(error.message || 'Failed to create account');
       setLoading(false);
@@ -142,7 +152,7 @@ export default function Welcome() {
                   type="button"
                   variant="outline"
                   className="w-full h-12 text-base border-2 hover:bg-slate-50"
-                  onClick={() => base44.auth.redirectToLogin(createPageUrl('OnboardingRole'))}
+                  onClick={() => base44.auth.redirectToLogin(createPageUrl('Welcome'))}
                 >
                   <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
