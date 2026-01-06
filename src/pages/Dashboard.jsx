@@ -182,7 +182,7 @@ export default function Dashboard() {
 
   const connectMutation = useMutation({
     mutationFn: async () => {
-      const response = await base44.functions.invoke('startSquareConnect', {});
+      const response = await base44.functions.invoke('squareOAuthStart', {});
       return response.data;
     },
     onSuccess: (data) => {
