@@ -164,11 +164,9 @@ export default function Layout({ children, currentPageName }) {
                     <div className="h-px bg-slate-200" />
                   </div>
                 )}
-                </div>
-                ))}
-                </div>
-                ))}
-                </nav>
+              </div>
+            ))}
+          </nav>
 
 
 
