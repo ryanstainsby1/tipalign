@@ -24,12 +24,12 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Missing config' }, { status: 500 });
     }
 
-    // Get organization - simplified approach
+    // Get organization - use asServiceRole for reliable access
     console.log('Fetching memberships for user:', user.id);
-    const memberships = await base44.entities.UserOrganizationMembership.list('-created_date', 100);
-    console.log('Total memberships found:', memberships.length);
-    
-    const userMemberships = memberships.filter(m => m.user_id === user.id && m.status === 'active');
+    const userMemberships = await base44.asServiceRole.entities.UserOrganizationMembership.filter({
+      user_id: user.id,
+      status: 'active'
+    });
     console.log('User active memberships:', userMemberships.length);
 
     if (userMemberships.length === 0) {
