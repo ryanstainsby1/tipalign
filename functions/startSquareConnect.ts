@@ -85,10 +85,12 @@ Deno.serve(async (req) => {
 
     const authUrl = `${baseAuth}?${params.toString()}`;
 
+    console.log('Redirecting to Square OAuth:', authUrl);
+
     return Response.json({ success: true, redirect_url: authUrl });
 
   } catch (error) {
     console.error('Start Square Connect error:', error);
-    return Response.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return Response.json({ success: false, error: error.message || 'Internal server error' }, { status: 500 });
   }
 });
