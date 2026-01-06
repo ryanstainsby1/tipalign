@@ -7,21 +7,27 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
 
     if (!user) {
-      return Response.json({ error: 'Not authenticated' }, { status: 401 });
+      return Response.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Get user's organization
-    const memberships = await base44.entities.UserOrganizationMembership.filter({
+    console.log('User authenticated:', user.email);
+
+    // Get user's organization using asServiceRole for reliable access
+    const memberships = await base44.asServiceRole.entities.UserOrganizationMembership.filter({
       user_id: user.id,
       status: 'active'
     });
 
+    console.log('Found memberships:', memberships.length);
+
     const membership = memberships.find(m => m.membership_role === 'owner' || m.membership_role === 'admin');
     if (!membership) {
-      return Response.json({ error: 'No organization found or insufficient permissions' }, { status: 403 });
+      console.error('No valid membership found for user:', user.email);
+      return Response.json({ success: false, error: 'No organization found or insufficient permissions' }, { status: 403 });
     }
 
     const orgId = membership.organization_id;
+    console.log('Using organization:', orgId);
 
     // Create secure state payload
     const stateData = {
