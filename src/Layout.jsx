@@ -59,6 +59,9 @@ export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
+  
+  // Hide layout chrome for public pages
+  const isPublicPage = currentPageName === 'Welcome';
 
   useEffect(() => {
     const checkUserAccess = async () => {
@@ -88,6 +91,16 @@ export default function Layout({ children, currentPageName }) {
   const handleLogout = () => {
     base44.auth.logout();
   };
+
+  // Render public page without layout chrome
+  if (isPublicPage) {
+    return (
+      <>
+        <Toaster position="top-right" richColors />
+        {children}
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
