@@ -53,11 +53,14 @@ Deno.serve(async (req) => {
       ? 'https://connect.squareup.com/oauth2/authorize'
       : 'https://connect.squareupsandbox.com/oauth2/authorize';
 
+    const redirectUri = `${BASE_URL}/functions/squareCallback`;
+
     const params = new URLSearchParams({
       client_id: SQUARE_APP_ID,
       scope: 'PAYMENTS_READ MERCHANT_PROFILE_READ EMPLOYEES_READ TIMECARDS_READ',
       session: 'false',
-      state: state
+      state: state,
+      redirect_uri: redirectUri
     });
 
     const redirectUrl = `${authUrl}?${params}`;
