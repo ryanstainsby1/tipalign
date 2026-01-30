@@ -22,19 +22,38 @@ export default function Allocations() {
 
   const queryClient = useQueryClient();
 
+  const { data: currentOrg } = useQuery({
+    queryKey: ['currentOrganization'],
+    queryFn: async () => {
+      const response = await base44.functions.invoke('getCurrentOrganization', {});
+      return response.data.success ? response.data.organization : null;
+    },
+  });
+
+  const organizationId = currentOrg?.id;
+
   const { data: allocations = [], isLoading } = useQuery({
-    queryKey: ['allocations'],
-    queryFn: () => base44.entities.TipAllocation.list('-allocation_date', 200),
+    queryKey: ['allocations', organizationId],
+    queryFn: () => base44.entities.TipAllocation.filter({ organization_id: organizationId }),
+    enabled: !!organizationId,
   });
 
   const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => base44.entities.Employee.list(),
+    queryKey: ['employees', organizationId],
+    queryFn: () => base44.entities.Employee.filter({ 
+      organization_id: organizationId,
+      employment_status: 'active' 
+    }),
+    enabled: !!organizationId,
   });
 
   const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
-    queryFn: () => base44.entities.Location.list(),
+    queryKey: ['locations', organizationId],
+    queryFn: () => base44.entities.Location.filter({ 
+      organization_id: organizationId,
+      active: true 
+    }),
+    enabled: !!organizationId,
   });
 
   const updateMutation = useMutation({
