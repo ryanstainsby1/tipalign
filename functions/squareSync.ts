@@ -24,13 +24,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return Response.json({ success: false, error: 'Connection is not active' }, { status: 400 });
     }
 
+    // Check for stuck running syncs and clean them up
     const runningSyncs = await base44.asServiceRole.entities.SyncJob.filter({
       square_connection_id: connection_id,
       status: 'running'
     });
 
-    if (runningSyncs.length > 0) {
-      return Response.json({ success: false, error: 'A sync is already in progress' }, { status: 409 });
+    // Clean up any stuck syncs older than 10 minutes
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    for (const stuckSync of runningSyncs) {
+      if (stuckSync.started_at < tenMinutesAgo) {
+        console.log('Cleaning up stuck sync job: ' + stuckSync.id);
+        await base44.asServiceRole.entities.SyncJob.update(stuckSync.id, {
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          errors: [{ entity_type: 'sync', error_message: 'Sync timed out and was cleaned up' }]
+        });
+      } else {
+        // Recent sync still running
+        return Response.json({ success: false, error: 'A sync is already in progress. Please wait.' }, { status: 409 });
+      }
     }
 
     const syncJob = await base44.asServiceRole.entities.SyncJob.create({
@@ -68,7 +81,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           const response = await fetch(url, options);
           if (response.status === 429) {
             const retryAfter = parseInt(response.headers.get('Retry-After') || '5');
-            console.log('Rate limited. Waiting ' + retryAfter + 's...');
+            console.log('Square rate limited. Waiting ' + retryAfter + 's...');
             await delay(retryAfter * 1000);
             continue;
           }
@@ -83,7 +96,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw lastError;
     }
 
-    async function base44Retry<T>(operation: () => Promise<T>, maxRetries: number = 3): Promise<T> {
+    async function base44Retry<T>(operation: () => Promise<T>, maxRetries: number = 5): Promise<T> {
       let lastError: Error = new Error('Max retries exceeded');
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -92,10 +105,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
           lastError = error as Error;
           const errorObj = error as { status?: number };
           if (errorObj.status === 429) {
-            const waitTime = Math.min(2000 * Math.pow(2, attempt - 1), 30000);
-            console.log('Base44 rate limited. Waiting ' + waitTime + 'ms...');
+            const waitTime = Math.min(3000 * Math.pow(2, attempt - 1), 60000);
+            console.log('Base44 rate limited (attempt ' + attempt + '). Waiting ' + waitTime + 'ms...');
             await delay(waitTime);
-            if (attempt === maxRetries) throw error;
           } else {
             throw error;
           }
@@ -128,7 +140,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       
       const existingLocationMap = new Map<string, typeof existingLocations[0]>();
       for (const loc of existingLocations) {
-        existingLocationMap.set(loc.square_location_id, loc);
+        if (loc.square_location_id) {
+          existingLocationMap.set(loc.square_location_id, loc);
+        }
       }
 
       for (const sqLocation of squareLocations) {
@@ -163,19 +177,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
             });
             totalCreated++;
           }
-          await delay(100);
+          await delay(150);
         } catch (err) {
           const error = err as Error;
           console.error('Location sync error:', error.message);
           errors.push({ entity_type: 'locations', square_id: sqLocation.id, error_message: error.message });
         }
       }
-      console.log('Locations synced');
+      console.log('Locations synced: ' + existingLocationMap.size + ' existing, ' + squareLocations.length + ' from Square');
     } catch (err) {
       const error = err as Error;
       console.error('Failed to sync locations:', error);
       errors.push({ entity_type: 'locations', error_message: error.message });
     }
+
+    await delay(500);
 
     // 2. SYNC TEAM MEMBERS
     try {
@@ -200,12 +216,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       
       const existingEmployeeMap = new Map<string, typeof existingEmployees[0]>();
       for (const emp of existingEmployees) {
-        existingEmployeeMap.set(emp.square_team_member_id, emp);
+        if (emp.square_team_member_id) {
+          existingEmployeeMap.set(emp.square_team_member_id, emp);
+        }
       }
 
       for (const member of teamMembers) {
         const existing = existingEmployeeMap.get(member.id);
-        const fullName = ((member.given_name || '') + ' ' + (member.family_name || '')).trim() || 'Unknown';
+        const givenName = member.given_name || '';
+        const familyName = member.family_name || '';
+        const fullName = (givenName + ' ' + familyName).trim() || 'Unknown';
+        
         const employeeData = {
           organization_id: connection.organization_id,
           square_team_member_id: member.id,
@@ -228,19 +249,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
             });
             totalCreated++;
           }
-          await delay(100);
+          await delay(150);
         } catch (err) {
           const error = err as Error;
           console.error('Team member sync error:', error.message);
           errors.push({ entity_type: 'team_members', square_id: member.id, error_message: error.message });
         }
       }
-      console.log('Team members synced');
+      console.log('Team members synced: ' + teamMembers.length + ' from Square');
     } catch (err) {
       const error = err as Error;
       console.error('Failed to sync team members:', error);
       errors.push({ entity_type: 'team_members', error_message: error.message });
     }
+
+    await delay(500);
 
     // 3. SYNC PAYMENTS
     try {
@@ -259,25 +282,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
       
       const existingPaymentMap = new Map<string, typeof existingPayments[0]>();
       for (const p of existingPayments) {
-        if (p.organization_id === connection.organization_id) {
+        if (p.organization_id === connection.organization_id && p.square_payment_id) {
           existingPaymentMap.set(p.square_payment_id, p);
         }
       }
       console.log('Found ' + existingPaymentMap.size + ' existing payment records');
 
-      interface PaymentItem {
+      interface PaymentToProcess {
         payment: Record<string, unknown>;
         location: typeof locations[0];
       }
-      const paymentsToProcess: PaymentItem[] = [];
+      const paymentsToProcess: PaymentToProcess[] = [];
 
       for (const location of locations) {
+        if (!location.square_location_id) continue;
+        
         console.log('Fetching payments for: ' + location.name);
         let cursor: string | null = null;
         let hasMore = true;
+        let pageCount = 0;
 
-        while (hasMore) {
-          let url = baseUrl + '/payments?location_id=' + location.square_location_id + 
+        while (hasMore && pageCount < 20) {
+          pageCount++;
+          let url = baseUrl + '/payments?location_id=' + encodeURIComponent(location.square_location_id) + 
             '&begin_time=' + encodeURIComponent(beginTime) + 
             '&end_time=' + encodeURIComponent(endTime) + 
             '&limit=100';
@@ -297,7 +324,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           if (!paymentsRes.ok) {
             const errorText = await paymentsRes.text();
             console.error('Payments error for ' + location.name + ':', paymentsRes.status, errorText);
-            throw new Error('Failed to fetch payments: ' + paymentsRes.status);
+            break;
           }
 
           const paymentsData = await paymentsRes.json();
@@ -305,19 +332,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
           for (const payment of payments) {
             if (payment.status === 'COMPLETED') {
-              paymentsToProcess.push({ payment, location });
+              paymentsToProcess.push({ payment: payment, location: location });
             }
           }
 
           cursor = paymentsData.cursor || null;
           hasMore = cursor !== null;
+          
+          if (hasMore) {
+            await delay(200);
+          }
         }
       }
 
       console.log('Processing ' + paymentsToProcess.length + ' payments...');
 
-      const BATCH_SIZE = 10;
-      const BATCH_DELAY = 1500;
+      const BATCH_SIZE = 5;
+      const BATCH_DELAY = 2000;
       const totalBatches = Math.ceil(paymentsToProcess.length / BATCH_SIZE);
 
       for (let i = 0; i < paymentsToProcess.length; i += BATCH_SIZE) {
@@ -327,12 +358,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const batch = paymentsToProcess.slice(i, i + BATCH_SIZE);
 
         for (const item of batch) {
-          const payment = item.payment as Record<string, unknown>;
+          const payment = item.payment;
           const location = item.location;
+          const paymentId = payment.id as string;
 
           try {
             const amountMoney = payment.amount_money as { amount?: number } | undefined;
-            const tipMoney = payment.tip_money as { amount?: number; currency?: string } | undefined;
+            const tipMoney = payment.tip_money as { amount?: number } | undefined;
             const totalMoney = payment.total_money as { amount?: number } | undefined;
             const processingFeeArr = payment.processing_fee as Array<{ amount_money?: { amount?: number } }> | undefined;
             const cardDetails = payment.card_details as { card?: { card_brand?: string } } | undefined;
@@ -360,10 +392,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
               source = 'cash';
             }
 
+            const cardBrand = cardDetails?.card?.card_brand || (cashDetails ? 'CASH' : null);
+
             const summaryData = {
               organization_id: connection.organization_id,
               location_id: location.id,
-              square_payment_id: payment.id as string,
+              square_payment_id: paymentId,
               square_order_id: (payment.order_id as string) || null,
               payment_created_at: payment.created_at as string,
               gross_amount_pence: grossAmount,
@@ -372,12 +406,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
               processing_fee_pence: processingFee,
               net_amount_pence: netAmount,
               team_member_id: (payment.team_member_id as string) || null,
-              card_brand: cardDetails?.card?.card_brand || (cashDetails ? 'CASH' : null),
+              card_brand: cardBrand,
               source: source,
               synced_at: new Date().toISOString()
             };
 
-            const existing = existingPaymentMap.get(payment.id as string);
+            const existing = existingPaymentMap.get(paymentId);
 
             if (existing) {
               await base44Retry(function() {
@@ -390,10 +424,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
               });
               totalCreated++;
             }
+            
+            await delay(200);
           } catch (err) {
             const error = err as Error;
             console.error('Payment sync error:', error.message);
-            errors.push({ entity_type: 'payments', square_id: payment.id as string, error_message: error.message });
+            errors.push({ entity_type: 'payments', square_id: paymentId, error_message: error.message });
             totalSkipped++;
           }
         }
@@ -403,7 +439,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
       }
 
-      console.log('Payments synced: ' + totalCreated + ' created, ' + totalUpdated + ' updated');
+      console.log('Payments synced: ' + totalCreated + ' created, ' + totalUpdated + ' updated, ' + totalSkipped + ' skipped');
     } catch (err) {
       const error = err as Error;
       console.error('Failed to sync payments:', error);
@@ -413,10 +449,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // 4. FINALIZE
     console.log('[4/4] Finalizing sync...');
     
+    const finalStatus = errors.length > 0 ? 'partial' : 'completed';
+    
     await base44Retry(function() {
       return base44.asServiceRole.entities.SyncJob.update(syncJob.id, {
         completed_at: new Date().toISOString(),
-        status: errors.length > 0 ? 'partial' : 'completed',
+        status: finalStatus,
         records_created: totalCreated,
         records_updated: totalUpdated,
         records_skipped: totalSkipped,
