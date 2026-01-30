@@ -60,7 +60,8 @@ Deno.serve(async (req) => {
       scope: 'PAYMENTS_READ MERCHANT_PROFILE_READ EMPLOYEES_READ TIMECARDS_READ',
       session: 'false',
       state: state,
-      redirect_uri: redirectUri
+      redirect_uri: redirectUri,
+      response_type: 'code'
     });
 
     const redirectUrl = `${authUrl}?${params}`;
