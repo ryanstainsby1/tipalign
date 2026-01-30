@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
 
     const params = new URLSearchParams({
       client_id: SQUARE_APP_ID,
-      scope: 'PAYMENTS_READ MERCHANT_PROFILE_READ EMPLOYEES_READ TIMECARDS_READ',
+      scope: 'MERCHANT_PROFILE_READ EMPLOYEES_READ PAYMENTS_READ ORDERS_READ TIMECARDS_READ',
       session: 'false',
       state: state,
       redirect_uri: redirectUri,
