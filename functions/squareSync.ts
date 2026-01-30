@@ -369,7 +369,7 @@ Deno.serve(async (req) => {
         // Create allocation
         const allocationData = {
           organization_id: orgId,
-          payment_id: payment.id,
+          transaction_id: payment.square_payment_id,
           employee_id: payment.employee_id,
           square_employee_id: payment.square_team_member_id,
           location_id: payment.location_id,
