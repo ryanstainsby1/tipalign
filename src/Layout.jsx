@@ -243,11 +243,11 @@ export default function Layout({ children, currentPageName }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div style={{ height: '50px', display: 'flex', alignItems: 'center' }}>
+            <div style={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img 
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
+                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/8a13ba3a4_Screenshot2026-01-30at210737.png" 
                 alt="Tiply – digital tip management"
-                style={{ height: '50px', width: 'auto', maxWidth: '220px', objectFit: 'contain', display: 'block' }}
+                style={{ height: '60px', width: 'auto', maxWidth: '240px', objectFit: 'contain', display: 'block' }}
               />
             </div>
             <div className="w-10" /> {/* Spacer for centering */}
