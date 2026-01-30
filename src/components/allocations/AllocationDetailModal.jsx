@@ -35,14 +35,15 @@ export default function AllocationDetailModal({
     return `£${(value / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
   };
 
-  // Mock transactions for this allocation
-  const transactions = [
-    { id: 'TXN001', amount: 500, time: '14:23', method: 'Card' },
-    { id: 'TXN002', amount: 750, time: '15:45', method: 'Card' },
-    { id: 'TXN003', amount: 250, time: '16:12', method: 'Card' },
-  ];
-
-  const totalFromTransactions = transactions.reduce((sum, t) => sum + t.amount, 0);
+  // Single transaction - individual allocation
+  const transaction = allocation.transaction_id 
+    ? { 
+        id: allocation.transaction_id.substring(0, 8),
+        amount: allocation.gross_amount,
+        time: format(new Date(allocation.allocation_date), 'HH:mm'),
+        method: 'Card'
+      }
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -83,38 +84,38 @@ export default function AllocationDetailModal({
           </div>
 
           {/* Transaction Breakdown */}
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-slate-600" />
-                Transaction Breakdown
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left text-sm font-semibold text-slate-700 pb-3">Transaction ID</th>
-                      <th className="text-left text-sm font-semibold text-slate-700 pb-3">Amount</th>
-                      <th className="text-left text-sm font-semibold text-slate-700 pb-3">Time</th>
-                      <th className="text-left text-sm font-semibold text-slate-700 pb-3">Payment Method</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((txn) => (
-                      <tr key={txn.id} className="border-b border-slate-100">
-                        <td className="py-3 text-sm text-slate-900">{txn.id}</td>
-                        <td className="py-3 text-sm font-semibold text-slate-900">
-                          {formatCurrency(txn.amount)}
-                        </td>
-                        <td className="py-3 text-sm text-slate-600">{txn.time}</td>
-                        <td className="py-3 text-sm text-slate-600">{txn.method}</td>
+          {transaction && (
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Calculator className="w-5 h-5 text-slate-600" />
+                  Transaction Breakdown
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="text-left text-sm font-semibold text-slate-700 pb-3">Transaction ID</th>
+                        <th className="text-left text-sm font-semibold text-slate-700 pb-3">Amount</th>
+                        <th className="text-left text-sm font-semibold text-slate-700 pb-3">Time</th>
+                        <th className="text-left text-sm font-semibold text-slate-700 pb-3">Payment Method</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-slate-100">
+                        <td className="py-3 text-sm text-slate-900">{transaction.id}</td>
+                        <td className="py-3 text-sm font-semibold text-slate-900">
+                          {formatCurrency(transaction.amount)}
+                        </td>
+                        <td className="py-3 text-sm text-slate-600">{transaction.time}</td>
+                        <td className="py-3 text-sm text-slate-600">{transaction.method}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Allocation Method */}
           <Card>
@@ -138,14 +139,12 @@ export default function AllocationDetailModal({
                 <div className="p-3 bg-slate-50 rounded-lg">
                   <p className="text-sm text-slate-900 font-medium mb-1">Calculation:</p>
                   <p className="text-sm text-slate-600">
-                    {transactions.length} tips = {formatCurrency(totalFromTransactions)} total ÷ 3 staff = {formatCurrency(totalFromTransactions / 3)} each
+                    1 tip = {formatCurrency(allocation.gross_amount)} allocated to {allocation.employee_name}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-slate-900 font-medium mb-2">Team members in this allocation:</p>
+                  <p className="text-sm text-slate-900 font-medium mb-2">Team member in this allocation:</p>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">Sarah Johnson</Badge>
-                    <Badge variant="outline">Mike Chen</Badge>
                     <Badge variant="outline">{allocation.employee_name}</Badge>
                   </div>
                 </div>
