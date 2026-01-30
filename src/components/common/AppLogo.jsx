@@ -7,14 +7,16 @@ export default function AppLogo() {
   
   return (
     <img 
-      src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/01bc0fe1b_ChatGPTImageDec28202501_53_32PM.png" 
-      alt="Tiply - digital tip management platform"
+      src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69492be29f510e4f29fe435b/8a13ba3a4_Screenshot2026-01-30at210737.png" 
+      alt="Tiply – digital tip management"
       onClick={() => navigate(createPageUrl('Dashboard'))}
       style={{
-        width: '180px',
-        height: 'auto',
+        height: '60px',
+        width: 'auto',
+        maxWidth: '240px',
+        objectFit: 'contain',
         display: 'block',
-        margin: '20px auto',
+        margin: '0 auto',
         cursor: 'pointer'
       }}
     />
