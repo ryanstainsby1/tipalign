@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
         client_secret: SQUARE_APP_SECRET,
         code: code,
         grant_type: 'authorization_code',
-        redirect_uri: 'https://tip-align-29fe435b.base44.app/functions/squareCallback'
+        redirect_uri: `${Deno.env.get('BASE_URL')}/functions/squareCallback`
       })
     });
 
