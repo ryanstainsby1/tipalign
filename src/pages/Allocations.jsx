@@ -232,7 +232,14 @@ export default function Allocations() {
         </div>
 
         {/* Allocation Pipeline - Kanban View */}
-        {filteredAllocations.length === 0 ? (
+        {isLoading ? (
+          <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 bg-slate-200 rounded w-48 mx-auto"></div>
+              <div className="h-4 bg-slate-200 rounded w-64 mx-auto"></div>
+            </div>
+          </div>
+        ) : filteredAllocations.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
             <div className="max-w-lg mx-auto">
               <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -240,7 +247,9 @@ export default function Allocations() {
               </div>
               <h3 className="text-2xl font-bold text-slate-900 mb-3">No allocations yet</h3>
               <p className="text-slate-600 mb-8 leading-relaxed">
-                Tips will appear here once they're captured via Square and processed by Tiply.
+                {allocations.length === 0 
+                  ? "Run a sync from the Dashboard to import tips from Square and create allocations."
+                  : "No allocations match your current filters. Try adjusting the filters above."}
               </p>
               
               <div className="bg-blue-50 rounded-xl p-6 text-left border border-blue-200">
