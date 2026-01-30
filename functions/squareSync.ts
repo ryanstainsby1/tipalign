@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       let lastError;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(`Attempt ${attempt}/${maxRetries} for ${url}`);
+          console.log(`Attempt ${attempt}/${maxRetries} for ${url.split('?')[0]}`);
           const response = await fetch(url, options);
           
           // Handle rate limiting
@@ -116,11 +116,15 @@ Deno.serve(async (req) => {
 
     // 1. Sync Locations
     try {
-      console.log('[1/3] Syncing locations...');
-      const locationsRes = await retryFetch(`${baseUrl}/locations`, { headers });
+      console.log('[1/4] Syncing locations...');
+      const locationsRes = await retryFetch(`${baseUrl}/locations`, { 
+        method: 'GET',
+        headers 
+      });
       
       if (!locationsRes.ok) {
-        throw new Error(`Failed to fetch locations: ${locationsRes.statusText}`);
+        const errorText = await locationsRes.text();
+        throw new Error(`Failed to fetch locations: ${locationsRes.status} ${locationsRes.statusText} - ${errorText}`);
       }
 
       const locationsData = await locationsRes.json();
@@ -182,7 +186,7 @@ Deno.serve(async (req) => {
 
     // 2. Sync Team Members
     try {
-      console.log('[2/3] Syncing team members...');
+      console.log('[2/4] Syncing team members...');
       const teamRes = await retryFetch(`${baseUrl}/team-members/search`, {
         method: 'POST',
         headers,
@@ -196,7 +200,8 @@ Deno.serve(async (req) => {
       });
 
       if (!teamRes.ok) {
-        throw new Error(`Failed to fetch team members: ${teamRes.statusText}`);
+        const errorText = await teamRes.text();
+        throw new Error(`Failed to fetch team members: ${teamRes.status} ${teamRes.statusText} - ${errorText}`);
       }
 
       const teamData = await teamRes.json();
@@ -248,10 +253,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3. Sync Payments (last 7 days)
+    // 3. Sync Payments (last 30 days) - FIXED: Using GET with query params
     try {
       console.log('[3/4] Syncing payments...');
-      const beginTime = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const beginTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const endTime = new Date().toISOString();
 
       // Get all locations for this org
@@ -260,30 +265,43 @@ Deno.serve(async (req) => {
       });
 
       for (const location of locations) {
+        console.log(`Fetching payments for location: ${location.name}`);
         let cursor = null;
         let hasMore = true;
+        let locationPaymentCount = 0;
 
         while (hasMore) {
-          const requestBody = {
+          // Build query parameters - Square List Payments uses GET
+          const params = new URLSearchParams({
             location_id: location.square_location_id,
             begin_time: beginTime,
             end_time: endTime,
-            limit: 100,
-            ...(cursor && { cursor })
-          };
+            limit: '100'
+          });
+          if (cursor) {
+            params.set('cursor', cursor);
+          }
 
-          const paymentsRes = await retryFetch(`${baseUrl}/payments`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(requestBody)
+          const paymentsUrl = `${baseUrl}/payments?${params.toString()}`;
+          
+          const paymentsRes = await retryFetch(paymentsUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Square-Version': '2024-12-18'
+            }
           });
 
           if (!paymentsRes.ok) {
-            throw new Error(`Failed to fetch payments for location ${location.name}: ${paymentsRes.statusText}`);
+            const errorText = await paymentsRes.text();
+            console.error(`Payments API error for ${location.name}:`, paymentsRes.status, errorText);
+            throw new Error(`Failed to fetch payments for location ${location.name}: ${paymentsRes.status} - ${errorText}`);
           }
 
           const paymentsData = await paymentsRes.json();
           const payments = paymentsData.payments || [];
+          
+          console.log(`  - Fetched ${payments.length} payments for ${location.name}`);
 
           for (const payment of payments) {
             try {
@@ -293,7 +311,14 @@ Deno.serve(async (req) => {
               const grossAmount = payment.amount_money?.amount || 0;
               const tipAmount = payment.tip_money?.amount || 0;
               const totalAmount = payment.total_money?.amount || (grossAmount + tipAmount);
-              const processingFee = payment.processing_fee?.find(f => f.type === 'PROCESSING_FEE')?.amount_money?.amount || 0;
+              
+              // Calculate processing fees
+              let processingFee = 0;
+              if (payment.processing_fee && Array.isArray(payment.processing_fee)) {
+                processingFee = payment.processing_fee.reduce((sum, fee) => {
+                  return sum + (fee.amount_money?.amount || 0);
+                }, 0);
+              }
               const netAmount = totalAmount - processingFee;
 
               // Determine source
@@ -304,6 +329,8 @@ Deno.serve(async (req) => {
                 source = 'wallet_pass';
               } else if (payment.source_type === 'TERMINAL') {
                 source = 'terminal';
+              } else if (payment.source_type === 'CASH') {
+                source = 'cash';
               }
 
               // Store in SquarePaymentSummary
@@ -324,7 +351,7 @@ Deno.serve(async (req) => {
                 processing_fee_pence: processingFee,
                 net_amount_pence: netAmount,
                 team_member_id: payment.team_member_id || null,
-                card_brand: payment.card_details?.card?.card_brand || null,
+                card_brand: payment.card_details?.card?.card_brand || (payment.cash_details ? 'CASH' : null),
                 source,
                 synced_at: new Date().toISOString()
               };
@@ -338,6 +365,8 @@ Deno.serve(async (req) => {
                 entityCounts.payments.created++;
                 totalCreated++;
               }
+              
+              locationPaymentCount++;
 
               // Also sync to legacy Payment table if tip exists
               if (tipAmount > 0) {
@@ -383,6 +412,8 @@ Deno.serve(async (req) => {
           cursor = paymentsData.cursor;
           hasMore = !!cursor;
         }
+        
+        console.log(`  - Total payments synced for ${location.name}: ${locationPaymentCount}`);
       }
 
       console.log(`Payments synced: ${entityCounts.payments.created} created, ${entityCounts.payments.updated} updated`);
@@ -402,26 +433,26 @@ Deno.serve(async (req) => {
         organization_id: connection.organization_id
       });
 
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       let summariesCreated = 0;
       let summariesUpdated = 0;
       
       for (const location of locations) {
         // Get all payment summaries for this location
-        const allPayments = await base44.asServiceRole.entities.SquarePaymentSummary.list('-payment_created_at', 1000);
+        const allPayments = await base44.asServiceRole.entities.SquarePaymentSummary.list('-payment_created_at', 5000);
         const payments = allPayments.filter(p => 
           p.organization_id === connection.organization_id && 
           p.location_id === location.id
         );
 
-        console.log(`Processing ${payments.length} payments for location ${location.name}`);
+        console.log(`Processing ${payments.length} payments for daily summaries - ${location.name}`);
 
         // Group by business date
         const dailyData = {};
         
         for (const payment of payments) {
           const paymentDate = new Date(payment.payment_created_at);
-          if (paymentDate < sevenDaysAgo) continue;
+          if (paymentDate < thirtyDaysAgo) continue;
           
           const businessDate = paymentDate.toISOString().split('T')[0];
           
@@ -434,9 +465,9 @@ Deno.serve(async (req) => {
             };
           }
           
-          dailyData[businessDate].gross += payment.gross_amount_pence;
-          dailyData[businessDate].tips += payment.tip_amount_pence;
-          dailyData[businessDate].net += payment.net_amount_pence;
+          dailyData[businessDate].gross += payment.gross_amount_pence || 0;
+          dailyData[businessDate].tips += payment.tip_amount_pence || 0;
+          dailyData[businessDate].net += payment.net_amount_pence || 0;
           dailyData[businessDate].count += 1;
         }
 
@@ -508,11 +539,6 @@ Deno.serve(async (req) => {
       errors: errors.length,
       duration_ms: duration
     });
-
-    // Alert if sync took too long
-    if (duration > 5 * 60 * 1000) {
-      console.warn(`⚠️ Sync took ${Math.round(duration / 1000)}s (exceeded 5 minute threshold)`);
-    }
 
     return Response.json({
       success: errors.length === 0,
