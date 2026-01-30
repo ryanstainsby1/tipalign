@@ -14,7 +14,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return Response.json({ success: false, error: 'connection_id is required' }, { status: 400 });
     }
 
+    // Helper function for delays
+    function wait(ms: number): Promise<void> {
+      return new Promise(function(resolve) { setTimeout(resolve, ms); });
+    }
+
     const connections = await base44.asServiceRole.entities.SquareConnection.filter({ id: connection_id });
+    await wait(300);
+    
     if (connections.length === 0) {
       return Response.json({ success: false, error: 'Connection not found' }, { status: 404 });
     }
@@ -24,17 +31,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return Response.json({ success: false, error: 'Connection is not active' }, { status: 400 });
     }
 
-    // Clean up any stuck syncs
+    // Clean up stuck syncs
     const runningSyncs = await base44.asServiceRole.entities.SyncJob.filter({
       square_connection_id: connection_id,
       status: 'running'
     });
+    await wait(300);
 
     for (const stuckSync of runningSyncs) {
       await base44.asServiceRole.entities.SyncJob.update(stuckSync.id, {
         status: 'failed',
         completed_at: new Date().toISOString()
       });
+      await wait(300);
     }
 
     const syncJob = await base44.asServiceRole.entities.SyncJob.create({
@@ -46,6 +55,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       status: 'running',
       triggered_by
     });
+    await wait(300);
 
     const accessToken = connection.square_access_token_encrypted;
     const baseUrl = 'https://connect.squareup.com/v2';
@@ -54,7 +64,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let totalUpdated = 0;
     const errors: Array<{ entity_type: string; error_message: string }> = [];
 
-    // 1. SYNC LOCATIONS (fast)
+    // 1. SYNC LOCATIONS
     try {
       console.log('[1/3] Syncing locations...');
       const locRes = await fetch(baseUrl + '/locations', {
@@ -68,6 +78,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const existingLocs = await base44.asServiceRole.entities.Location.filter({ 
           organization_id: connection.organization_id 
         });
+        await wait(300);
+        
         const locMap = new Map(existingLocs.map(function(l) { return [l.square_location_id, l]; }));
 
         for (const sq of squareLocations) {
@@ -88,15 +100,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
             await base44.asServiceRole.entities.Location.create(data);
             totalCreated++;
           }
+          await wait(400);
         }
-        console.log('Locations done');
+        console.log('Locations done: ' + squareLocations.length);
       }
     } catch (err) {
       console.error('Location error:', (err as Error).message);
       errors.push({ entity_type: 'locations', error_message: (err as Error).message });
     }
 
-    // 2. SYNC TEAM MEMBERS (fast)
+    // 2. SYNC TEAM MEMBERS
     try {
       console.log('[2/3] Syncing team members...');
       const teamRes = await fetch(baseUrl + '/team-members/search', {
@@ -116,6 +129,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const existingEmps = await base44.asServiceRole.entities.Employee.filter({ 
           organization_id: connection.organization_id 
         });
+        await wait(300);
+        
         const empMap = new Map(existingEmps.map(function(e) { return [e.square_team_member_id, e]; }));
 
         for (const m of members) {
@@ -137,32 +152,37 @@ Deno.serve(async (req: Request): Promise<Response> => {
             await base44.asServiceRole.entities.Employee.create(data);
             totalCreated++;
           }
+          await wait(400);
         }
-        console.log('Team members done');
+        console.log('Team members done: ' + members.length);
       }
     } catch (err) {
       console.error('Team error:', (err as Error).message);
       errors.push({ entity_type: 'team_members', error_message: (err as Error).message });
     }
 
-    // 3. SYNC PAYMENTS (last 3 days only for speed)
+    // 3. SYNC PAYMENTS - Only last 24 hours, only NEW payments with tips
     try {
       console.log('[3/3] Syncing payments...');
-      const beginTime = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+      const beginTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const endTime = new Date().toISOString();
 
       const locations = await base44.asServiceRole.entities.Location.filter({ 
         organization_id: connection.organization_id 
       });
+      await wait(300);
 
-      // Get existing payments in one call
-      const existingPayments = await base44.asServiceRole.entities.SquarePaymentSummary.list('-payment_created_at', 2000);
-      const payMap = new Map<string, typeof existingPayments[0]>();
+      // Get existing payment IDs
+      const existingPayments = await base44.asServiceRole.entities.SquarePaymentSummary.list('-payment_created_at', 1000);
+      await wait(300);
+      
+      const existingIds = new Set<string>();
       for (const p of existingPayments) {
-        if (p.organization_id === connection.organization_id) {
-          payMap.set(p.square_payment_id, p);
+        if (p.organization_id === connection.organization_id && p.square_payment_id) {
+          existingIds.add(p.square_payment_id);
         }
       }
+      console.log('Existing payments: ' + existingIds.size);
 
       for (const loc of locations) {
         if (!loc.square_location_id) continue;
@@ -170,29 +190,36 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const url = baseUrl + '/payments?location_id=' + loc.square_location_id + 
           '&begin_time=' + encodeURIComponent(beginTime) + 
           '&end_time=' + encodeURIComponent(endTime) + 
-          '&limit=50';
+          '&limit=30';
 
         const payRes = await fetch(url, {
           headers: { 'Authorization': 'Bearer ' + accessToken, 'Square-Version': '2024-12-18' }
         });
 
         if (!payRes.ok) {
-          console.error('Payment fetch failed for ' + loc.name + ': ' + payRes.status);
+          console.error('Payment fetch failed: ' + payRes.status);
           continue;
         }
 
         const payData = await payRes.json();
         const payments = payData.payments || [];
+        console.log('Fetched ' + payments.length + ' payments for ' + loc.name);
 
+        let newCount = 0;
         for (const p of payments) {
+          // Skip if not completed or already exists
           if (p.status !== 'COMPLETED') continue;
+          if (existingIds.has(p.id)) continue;
 
           const gross = p.amount_money?.amount || 0;
           const tip = p.tip_money?.amount || 0;
           const total = p.total_money?.amount || gross;
-          const fee = (p.processing_fee || []).reduce(function(sum: number, f: { amount_money?: { amount?: number } }) {
-            return sum + (f.amount_money?.amount || 0);
-          }, 0);
+          
+          let fee = 0;
+          const fees = p.processing_fee || [];
+          for (let i = 0; i < fees.length; i++) {
+            fee += fees[i].amount_money?.amount || 0;
+          }
 
           const data = {
             organization_id: connection.organization_id,
@@ -211,22 +238,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
             synced_at: new Date().toISOString()
           };
 
-          const existing = payMap.get(p.id);
-          
           try {
-            if (existing) {
-              await base44.asServiceRole.entities.SquarePaymentSummary.update(existing.id, data);
-              totalUpdated++;
-            } else {
-              await base44.asServiceRole.entities.SquarePaymentSummary.create(data);
-              totalCreated++;
-            }
+            await base44.asServiceRole.entities.SquarePaymentSummary.create(data);
+            totalCreated++;
+            newCount++;
+            await wait(500);
           } catch (dbErr) {
             console.error('DB error:', (dbErr as Error).message);
           }
+
+          // Limit to 10 new payments per location to avoid timeout
+          if (newCount >= 10) {
+            console.log('Reached limit for ' + loc.name);
+            break;
+          }
         }
         
-        console.log('Payments done for ' + loc.name);
+        console.log('Created ' + newCount + ' new payments for ' + loc.name);
       }
     } catch (err) {
       console.error('Payment error:', (err as Error).message);
@@ -234,6 +262,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // FINALIZE
+    await wait(300);
     await base44.asServiceRole.entities.SyncJob.update(syncJob.id, {
       completed_at: new Date().toISOString(),
       status: errors.length > 0 ? 'partial' : 'completed',
@@ -241,6 +270,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       records_updated: totalUpdated
     });
 
+    await wait(300);
     await base44.asServiceRole.entities.SquareConnection.update(connection.id, {
       last_sync_at: new Date().toISOString()
     });
