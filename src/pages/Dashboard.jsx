@@ -207,6 +207,16 @@ export default function Dashboard() {
         connection_id: squareConnection.id,
         triggered_by: 'manual'
       });
+      
+      // Auto-aggregate daily summaries after sync
+      try {
+        await base44.functions.invoke('aggregateDailySummaries', {
+          connection_id: squareConnection.id
+        });
+      } catch (e) {
+        console.error('Aggregation failed:', e);
+      }
+      
       return response.data;
     },
     onSuccess: (data) => {
@@ -216,6 +226,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['squareConnection'] });
       queryClient.invalidateQueries({ queryKey: ['lastSyncJob'] });
       queryClient.invalidateQueries({ queryKey: ['recentSyncJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['dailySummaries'] });
       
       const summary = [];
       if (data.entity_counts) {
