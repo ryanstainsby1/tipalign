@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { connection_id, triggered_by = 'manual' } = body;
 
-    console.log('=== FULL SYNC STARTED ===');
+    console.log('=== ENHANCED SYNC WITH WALLET UPDATES ===');
 
     if (!connection_id) {
       return Response.json({ success: false, error: 'connection_id is required' }, { status: 400 });
@@ -26,11 +26,14 @@ Deno.serve(async (req) => {
     }
 
     const connection = connections[0];
+    const orgId = connection.organization_id;
+    const accessToken = connection.square_access_token_encrypted;
+    const baseUrl = 'https://connect.squareup.com/v2';
+
     if (connection.connection_status !== 'connected') {
       return Response.json({ success: false, error: 'Connection is not active' }, { status: 400 });
     }
 
-    // Clean up stuck syncs
     const runningSyncs = await base44.asServiceRole.entities.SyncJob.filter({
       square_connection_id: connection_id,
       status: 'running'
@@ -46,31 +49,26 @@ Deno.serve(async (req) => {
     }
 
     const syncJob = await base44.asServiceRole.entities.SyncJob.create({
-      organization_id: connection.organization_id,
+      organization_id: orgId,
       square_connection_id: connection_id,
       sync_type: 'full',
-      entities_synced: ['locations', 'team_members', 'payments', 'allocations'],
+      entities_synced: ['locations', 'team_members', 'payments', 'allocations', 'wallets'],
       started_at: new Date().toISOString(),
       status: 'running',
       triggered_by
     });
     await wait(300);
 
-    const accessToken = connection.square_access_token_encrypted;
-    const baseUrl = 'https://connect.squareup.com/v2';
-    const orgId = connection.organization_id;
-
     let totalCreated = 0;
     let totalUpdated = 0;
     let allocationsCreated = 0;
-    let totalTipsAllocated = 0;
+    let walletsUpdated = 0;
+    const affectedEmployees = new Set();
     const errors = [];
 
-    // ============================================
     // STEP 1: SYNC LOCATIONS
-    // ============================================
-    console.log('[1/5] Syncing locations...');
-    let locationMap = new Map();
+    console.log('[1/6] Syncing locations...');
+    const locationMap = new Map();
     
     try {
       const locRes = await fetch(baseUrl + '/locations', {
@@ -116,11 +114,9 @@ Deno.serve(async (req) => {
       errors.push({ entity_type: 'locations', error_message: err.message });
     }
 
-    // ============================================
-    // STEP 2: SYNC TEAM MEMBERS / EMPLOYEES
-    // ============================================
-    console.log('[2/5] Syncing employees...');
-    let employeeMap = new Map();
+    // STEP 2: SYNC EMPLOYEES
+    console.log('[2/6] Syncing employees...');
+    const employeeMap = new Map();
     
     try {
       const teamRes = await fetch(baseUrl + '/team-members/search', {
@@ -152,9 +148,7 @@ Deno.serve(async (req) => {
             email: m.email_address || '',
             phone: m.phone_number || '',
             employment_status: 'active',
-            role: 'server',
-            total_tips_earned_lifetime: existing?.total_tips_earned_lifetime || 0,
-            pending_tips: existing?.pending_tips || 0
+            role: 'server'
           };
 
           let empRecord;
@@ -176,7 +170,6 @@ Deno.serve(async (req) => {
       errors.push({ entity_type: 'employees', error_message: err.message });
     }
 
-    // Refresh employee list for later use
     const allEmployees = await base44.asServiceRole.entities.Employee.filter({ organization_id: orgId });
     await wait(300);
     for (const emp of allEmployees) {
@@ -185,7 +178,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Refresh location list
     const allLocations = await base44.asServiceRole.entities.Location.filter({ organization_id: orgId });
     await wait(300);
     for (const loc of allLocations) {
@@ -194,45 +186,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ============================================
     // STEP 3: SYNC PAYMENTS
-    // ============================================
-    console.log('[3/5] Syncing payments...');
+    console.log('[3/6] Syncing payments...');
     
     const beginTime = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const endTime = new Date().toISOString();
 
-    // Get existing payments
-    const existingPayments = await base44.asServiceRole.entities.Payment.list('-payment_date', 2000);
+    const existingPayments = await base44.asServiceRole.entities.SquarePaymentSummary.filter({ organization_id: orgId });
     await wait(300);
     
     const existingPaymentMap = new Map();
     for (const p of existingPayments) {
-      if (p.organization_id === orgId && p.square_payment_id) {
+      if (p.square_payment_id) {
         existingPaymentMap.set(p.square_payment_id, p);
       }
     }
 
-    // Get existing allocations to avoid duplicates
-    const existingAllocations = await base44.asServiceRole.entities.TipAllocation.list('-created_date', 2000);
-    await wait(300);
-    
-    const existingAllocationPaymentIds = new Set();
-    for (const a of existingAllocations) {
-      if (a.payment_id) {
-        const payment = existingPaymentMap.get(a.payment_id);
-        if (payment && payment.square_payment_id) {
-          existingAllocationPaymentIds.add(payment.square_payment_id);
-        }
-      }
-    }
-    console.log('Existing allocations: ' + existingAllocationPaymentIds.size);
+    const newPaymentsWithTips = [];
 
     try {
       for (const loc of allLocations) {
         if (!loc.square_location_id) continue;
-
-        console.log('Processing payments for: ' + loc.name);
 
         const url = baseUrl + '/payments?location_id=' + loc.square_location_id + 
           '&begin_time=' + encodeURIComponent(beginTime) + 
@@ -243,17 +217,12 @@ Deno.serve(async (req) => {
           headers: { 'Authorization': 'Bearer ' + accessToken, 'Square-Version': '2024-12-18' }
         });
 
-        if (!payRes.ok) {
-          console.error('Payment fetch failed for ' + loc.name + ': ' + payRes.status);
-          continue;
-        }
+        if (!payRes.ok) continue;
 
         const payData = await payRes.json();
         const payments = payData.payments || [];
-        console.log('Fetched ' + payments.length + ' payments');
 
-        let locPaymentCount = 0;
-
+        let locCount = 0;
         for (const p of payments) {
           if (p.status !== 'COMPLETED') continue;
 
@@ -267,60 +236,62 @@ Deno.serve(async (req) => {
             fee += fees[i].amount_money?.amount || 0;
           }
 
-          // Get Square team member ID
           const squareTeamId = p.team_member_id || p.employee_id || null;
-          
-          // Map to our employee
           let employeeId = null;
           if (squareTeamId && employeeMap.has(squareTeamId)) {
-            const emp = employeeMap.get(squareTeamId);
-            if (emp) {
-              employeeId = emp.id;
-            }
+            employeeId = employeeMap.get(squareTeamId)?.id || null;
           }
 
           const paymentData = {
             organization_id: orgId,
             location_id: loc.id,
-            square_location_id: loc.square_location_id,
             square_payment_id: p.id,
             square_order_id: p.order_id || null,
-            payment_date: p.created_at,
-            total_amount: total,
-            tip_amount: tip,
-            currency: 'GBP',
-            employee_id: employeeId,
+            payment_created_at: p.created_at,
+            gross_amount_pence: gross,
+            tip_amount_pence: tip,
+            total_amount_pence: total,
+            processing_fee_pence: fee,
+            net_amount_pence: total - fee,
             square_team_member_id: squareTeamId,
-            processing_fee: fee,
-            card_brand: p.card_details?.card?.card_brand || (p.cash_details ? 'CASH' : null),
-            payment_source_type: p.source_type || 'CARD',
-            status: 'completed'
+            employee_id: employeeId,
+            card_brand: p.card_details?.card?.card_brand || null,
+            source: p.source_type || 'CARD',
+            synced_at: new Date().toISOString()
           };
 
           const existing = existingPaymentMap.get(p.id);
+          const isNew = !existing;
 
           try {
-            let paymentRecord;
             if (existing) {
-              await base44.asServiceRole.entities.Payment.update(existing.id, paymentData);
-              paymentRecord = existing;
+              await base44.asServiceRole.entities.SquarePaymentSummary.update(existing.id, paymentData);
               totalUpdated++;
             } else {
-              paymentRecord = await base44.asServiceRole.entities.Payment.create(paymentData);
-              existingPaymentMap.set(p.id, paymentRecord);
+              await base44.asServiceRole.entities.SquarePaymentSummary.create(paymentData);
               totalCreated++;
             }
-            locPaymentCount++;
+            locCount++;
             await wait(250);
+
+            if (isNew && tip > 0) {
+              newPaymentsWithTips.push({
+                paymentId: p.id,
+                tip: tip,
+                employeeId: employeeId,
+                locationId: loc.id,
+                createdAt: p.created_at
+              });
+              
+              if (employeeId) {
+                affectedEmployees.add(employeeId);
+              }
+            }
           } catch (dbErr) {
-            console.error('Payment DB error: ' + dbErr.message);
+            console.error('Payment DB error:', dbErr.message);
           }
 
-          // Rate limit
-          if (locPaymentCount >= 25) {
-            console.log('Rate limit reached for ' + loc.name);
-            break;
-          }
+          if (locCount >= 25) break;
         }
       }
     } catch (err) {
@@ -328,142 +299,148 @@ Deno.serve(async (req) => {
       errors.push({ entity_type: 'payments', error_message: err.message });
     }
 
-    // ============================================
-    // STEP 4: CREATE TIP ALLOCATIONS
-    // ============================================
-    console.log('[4/5] Creating tip allocations...');
-    
+    console.log('New payments with tips: ' + newPaymentsWithTips.length);
+
+    // STEP 4: CREATE ALLOCATIONS
+    console.log('[4/6] Creating allocations...');
+
+    let existingAllocations = [];
     try {
-      // Get fresh payment data with tips
-      const paymentsWithTips = await base44.asServiceRole.entities.Payment.filter({
-        organization_id: orgId
-      });
+      existingAllocations = await base44.asServiceRole.entities.TipAllocation.filter({ organization_id: orgId });
       await wait(300);
-
-      for (const payment of paymentsWithTips) {
-        // Skip if no tip or already allocated
-        if (!payment.tip_amount || payment.tip_amount <= 0) continue;
-        if (payment.square_payment_id && existingAllocationPaymentIds.has(payment.square_payment_id)) continue;
-
-        // Skip if no employee assigned
-        if (!payment.employee_id) continue;
-
-        // Get employee name
-        let empName = 'Unknown';
-        for (const [sqId, emp] of employeeMap) {
-          if (emp.id === payment.employee_id) {
-            empName = emp.name;
-            break;
-          }
-        }
-
-        // Get location name
-        let locName = 'Unknown Location';
-        for (const [sqId, locInfo] of locationMap) {
-          if (locInfo.id === payment.location_id) {
-            locName = locInfo.name;
-            break;
-          }
-        }
-
-        // Create allocation
-        const allocationData = {
-          organization_id: orgId,
-          transaction_id: payment.square_payment_id,
-          employee_id: payment.employee_id,
-          square_employee_id: payment.square_team_member_id,
-          location_id: payment.location_id,
-          allocation_date: payment.payment_date || new Date().toISOString(),
-          gross_amount: payment.tip_amount,
-          allocation_method: 'individual',
-          status: 'pending'
-        };
-
-        try {
-          await base44.asServiceRole.entities.TipAllocation.create(allocationData);
-          allocationsCreated++;
-          totalTipsAllocated += payment.tip_amount;
-          if (payment.square_payment_id) {
-            existingAllocationPaymentIds.add(payment.square_payment_id);
-          }
-          console.log('Allocation created: ' + (payment.tip_amount/100).toFixed(2) + ' GBP for ' + empName + ' at ' + locName);
-          await wait(400);
-        } catch (allocErr) {
-          console.error('Allocation error: ' + allocErr.message);
-        }
-
-        // Rate limit
-        if (allocationsCreated >= 30) {
-          console.log('Allocation rate limit reached');
-          break;
-        }
-      }
-      
-      console.log('Allocations created: ' + allocationsCreated);
-    } catch (err) {
-      console.error('Allocation sync error:', err.message);
-      errors.push({ entity_type: 'allocations', error_message: err.message });
+    } catch (e) {
+      console.log('TipAllocation entity may not exist');
     }
 
-    // ============================================
+    const existingAllocationPaymentIds = new Set();
+    for (const a of existingAllocations) {
+      if (a.square_payment_id) {
+        existingAllocationPaymentIds.add(a.square_payment_id);
+      }
+    }
+
+    for (const tipPayment of newPaymentsWithTips) {
+      if (existingAllocationPaymentIds.has(tipPayment.paymentId)) continue;
+
+      const allocationData = {
+        organization_id: orgId,
+        location_id: tipPayment.locationId,
+        employee_id: tipPayment.employeeId,
+        square_payment_id: tipPayment.paymentId,
+        amount: tipPayment.tip,
+        tip_amount_pence: tipPayment.tip,
+        tip_amount: tipPayment.tip / 100,
+        allocation_date: tipPayment.createdAt.split('T')[0],
+        date: tipPayment.createdAt.split('T')[0],
+        status: tipPayment.employeeId ? 'pending' : 'unassigned',
+        created_at: new Date().toISOString()
+      };
+
+      try {
+        await base44.asServiceRole.entities.TipAllocation.create(allocationData);
+        allocationsCreated++;
+        await wait(400);
+      } catch (allocErr) {
+        console.error('Allocation error:', allocErr.message);
+      }
+
+      if (allocationsCreated >= 30) break;
+    }
+
+    console.log('Allocations created: ' + allocationsCreated);
+
     // STEP 5: UPDATE EMPLOYEE TOTALS
-    // ============================================
-    console.log('[5/5] Updating employee totals...');
-    
+    console.log('[5/6] Updating employee totals...');
+
     try {
-      // Calculate totals from all allocations
-      const allAllocations = await base44.asServiceRole.entities.TipAllocation.filter({
-        organization_id: orgId
-      });
+      const allAllocations = await base44.asServiceRole.entities.TipAllocation.filter({ organization_id: orgId });
       await wait(300);
 
-      // Sum tips per employee
       const empTotals = new Map();
       
       for (const alloc of allAllocations) {
-        if (!alloc.employee_id) continue;
+        const empId = alloc.employee_id;
+        if (!empId) continue;
         
-        const current = empTotals.get(alloc.employee_id) || { earned: 0, pending: 0 };
-        const amount = alloc.gross_amount || 0;
+        const current = empTotals.get(empId) || { earned: 0, pending: 0 };
+        const amount = alloc.tip_amount_pence || alloc.amount || 0;
+        const status = alloc.status;
         
-        if (alloc.status === 'confirmed' || alloc.status === 'paid') {
+        if (status === 'confirmed' || status === 'paid' || status === 'completed') {
           current.earned += amount;
         } else {
           current.pending += amount;
         }
         
-        empTotals.set(alloc.employee_id, current);
+        empTotals.set(empId, current);
+        affectedEmployees.add(empId);
       }
 
-      // Update each employee
       let empUpdated = 0;
       for (const [empId, totals] of empTotals) {
         try {
           await base44.asServiceRole.entities.Employee.update(empId, {
-            total_tips_earned_lifetime: totals.earned,
-            pending_tips: totals.pending
+            total_earned_pence: totals.earned,
+            pending_pence: totals.pending
           });
           empUpdated++;
           await wait(350);
-        } catch (empErr) {
-          console.error('Employee update error: ' + empErr.message);
+        } catch (err) {
+          console.error('Employee update error:', err.message);
         }
 
-        if (empUpdated >= 25) {
-          console.log('Employee update rate limit reached');
-          break;
-        }
+        if (empUpdated >= 25) break;
       }
       
       console.log('Employee totals updated: ' + empUpdated);
     } catch (err) {
-      console.error('Employee total update error:', err.message);
-      errors.push({ entity_type: 'employee_totals', error_message: err.message });
+      console.error('Employee totals error:', err.message);
     }
 
-    // ============================================
+    // STEP 6: UPDATE WALLET PASSES
+    console.log('[6/6] Updating wallet passes...');
+
+    if (affectedEmployees.size > 0) {
+      for (const empId of affectedEmployees) {
+        try {
+          const walletPasses = await base44.asServiceRole.entities.WalletPass.filter({ employee_id: empId });
+
+          if (walletPasses.length > 0) {
+            let currentTips = 0;
+            const weekStart = new Date();
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+            weekStart.setHours(0, 0, 0, 0);
+
+            const empAllocations = await base44.asServiceRole.entities.TipAllocation.filter({ employee_id: empId });
+
+            for (const alloc of empAllocations) {
+              const allocDate = new Date(alloc.allocation_date || alloc.created_at);
+              if (allocDate >= weekStart) {
+                currentTips += alloc.tip_amount_pence || alloc.amount || 0;
+              }
+            }
+
+            await base44.asServiceRole.entities.WalletPass.update(walletPasses[0].id, {
+              current_tips_pence: currentTips,
+              last_updated: new Date().toISOString()
+            });
+            
+            walletsUpdated++;
+            console.log('Updated wallet for employee: ' + empId);
+          }
+          
+          await wait(300);
+        } catch (walletErr) {
+          console.log('Wallet update error:', walletErr.message);
+        }
+
+        if (walletsUpdated >= 10) break;
+      }
+    }
+
+    console.log('Wallet passes updated: ' + walletsUpdated);
+
     // FINALIZE
-    // ============================================
     await wait(300);
     await base44.asServiceRole.entities.SyncJob.update(syncJob.id, {
       completed_at: new Date().toISOString(),
@@ -478,19 +455,16 @@ Deno.serve(async (req) => {
     });
 
     const duration = Date.now() - startTime;
-    console.log('=== FULL SYNC COMPLETED in ' + duration + 'ms ===');
-    console.log('Summary: Created=' + totalCreated + ', Updated=' + totalUpdated + ', Allocations=' + allocationsCreated + ', Tips=' + (totalTipsAllocated/100).toFixed(2) + ' GBP');
+    console.log('=== SYNC COMPLETED in ' + duration + 'ms ===');
 
     return Response.json({
       success: true,
       summary: {
-        locations_synced: locationMap.size,
-        employees_synced: employeeMap.size,
-        payments_created: totalCreated,
-        payments_updated: totalUpdated,
+        records_created: totalCreated,
+        records_updated: totalUpdated,
         allocations_created: allocationsCreated,
-        tips_allocated_pence: totalTipsAllocated,
-        tips_allocated_gbp: (totalTipsAllocated/100).toFixed(2)
+        wallets_updated: walletsUpdated,
+        affected_employees: affectedEmployees.size
       },
       errors: errors,
       duration_ms: duration
