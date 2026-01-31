@@ -2,13 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, QrCode, RefreshCw, Download, Mail, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Wallet, QrCode, RefreshCw, Download, Mail, Clock, CheckCircle2, XCircle, Copy } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 export default function WalletPassSection({ employee, walletPass, onRefresh }) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [walletConfig, setWalletConfig] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
 
   const handleGeneratePass = async () => {
     setIsGenerating(true);
@@ -41,26 +46,65 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
   };
 
   const handleSendInvite = async () => {
-    setIsGenerating(true);
+    setIsSending(true);
     try {
-      const response = await base44.functions.invoke('sendEmployeeWalletInvite', {
+      const response = await base44.functions.invoke('walletInvite', {
         employee_id: employee.id,
-        channel: 'email'
+        invite_method: 'email'
       });
 
       if (response.data.success) {
-        toast.success('Invite sent!', {
-          description: `Wallet invite emailed to ${employee.email}`
+        if (response.data.requires_manual_share) {
+          setShareUrl(response.data.wallet_url);
+          setShowShareModal(true);
+          toast.info('Email not configured', {
+            description: 'Share the wallet link manually with the employee'
+          });
+        } else {
+          toast.success('Invite sent!', {
+            description: `Wallet invite emailed to ${employee.email}`
+          });
+          loadInvites();
+        }
+      } else {
+        toast.error('Failed to send invite', {
+          description: response.data.error || 'Unknown error'
         });
-        loadInvites();
       }
     } catch (error) {
       toast.error('Failed to send invite', {
         description: error.message
       });
     } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await base44.functions.invoke('generatePkpass', {
+        employee_id: employee.id
+      });
+
+      if (response.data.success) {
+        toast.success('Pass generated!', {
+          description: 'Pass data ready for download'
+        });
+        console.log('Pass JSON:', response.data.pass_json);
+      }
+    } catch (error) {
+      toast.error('Failed to generate pass', {
+        description: error.message
+      });
+    } finally {
       setIsGenerating(false);
     }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
   };
 
   const [invites, setInvites] = useState([]);
@@ -69,7 +113,7 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
   const loadInvites = async () => {
     setLoadingInvites(true);
     try {
-      const allInvites = await base44.entities.EmployeeWalletInvite.filter({
+      const allInvites = await base44.entities.WalletInvite.filter({
         employee_id: employee.id
       });
       setInvites(allInvites.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at)));
@@ -80,7 +124,17 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
     }
   };
 
+  const checkWalletConfig = async () => {
+    try {
+      const response = await base44.functions.invoke('walletConfigCheck', {});
+      setWalletConfig(response.data);
+    } catch (error) {
+      console.error('Failed to check wallet config:', error);
+    }
+  };
+
   useEffect(() => {
+    checkWalletConfig();
     if (walletPass) {
       loadInvites();
     }
@@ -171,20 +225,30 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
             <div className="space-y-3">
               <Button 
                 onClick={handleSendInvite}
-                disabled={isGenerating || !employee.email}
+                disabled={isSending || !employee.email}
                 className="w-full bg-indigo-600 hover:bg-indigo-700"
               >
-                <Mail className="w-4 h-4 mr-2" />
-                Send Wallet Invite
+                {isSending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Wallet Invite
+                  </>
+                )}
               </Button>
               <div className="flex gap-3">
                 <Button 
-                  onClick={handleAddToWallet}
+                  onClick={handleDownload}
+                  disabled={isGenerating}
                   variant="outline"
                   className="flex-1"
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
+                  <Download className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                  {isGenerating ? 'Generating...' : 'Download'}
                 </Button>
                 <Button 
                   onClick={handleGeneratePass}
@@ -266,22 +330,46 @@ export default function WalletPassSection({ employee, walletPass, onRefresh }) {
               </div>
             )}
 
-            {/* Setup Instructions */}
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-semibold text-blue-900 mb-2 text-sm">Apple Wallet Setup Required</h4>
-              <div className="text-xs text-blue-700 space-y-1">
-                <p><strong>Administrator:</strong> Configure these environment variables:</p>
-                <ul className="list-disc ml-4 mt-1 space-y-0.5">
-                  <li>APPLE_WALLET_PASS_TYPE_ID</li>
-                  <li>APPLE_WALLET_TEAM_ID</li>
-                  <li>APPLE_WALLET_CERT_P12_BASE64</li>
-                  <li>APPLE_WALLET_CERT_PASSWORD</li>
-                </ul>
-                <p className="mt-2">Get certificates from Apple Developer Portal → Identifiers → Pass Type IDs</p>
+            {/* Config Status - Only show if wallet not configured */}
+            {walletConfig && !walletConfig.wallet_configured && (
+              <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <h4 className="font-semibold text-amber-900 mb-2 text-sm">Apple Wallet Setup Required</h4>
+                <div className="text-xs text-amber-700 space-y-1">
+                  <p><strong>Administrator:</strong> Configure Apple Wallet certificates in environment variables</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
+
+        {/* Share Link Modal */}
+        <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share Wallet Link</DialogTitle>
+              <DialogDescription>
+                Email is not configured. Share this link manually with {employee.full_name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-sm text-slate-600 mb-2">Wallet Pass URL:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-white p-2 rounded border border-slate-300 break-all">
+                    {shareUrl}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyToClipboard(shareUrl)}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
