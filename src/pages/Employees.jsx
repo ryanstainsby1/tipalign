@@ -95,7 +95,30 @@ export default function Employees() {
             <p className="text-slate-500 mt-1">Manage team members and allocations</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="border-slate-200">
+            <Button 
+              variant="outline" 
+              className="border-slate-200"
+              onClick={async () => {
+                try {
+                  const response = await base44.functions.invoke('exportEmployeesCSV', {
+                    organization_id: currentOrg?.id
+                  });
+                  if (response.data.csv_data) {
+                    const blob = new Blob([response.data.csv_data], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `employees-${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                  }
+                } catch (error) {
+                  console.error('Export failed:', error);
+                }
+              }}
+            >
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
