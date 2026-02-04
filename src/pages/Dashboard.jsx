@@ -25,7 +25,7 @@ import LocationBreakdown from '@/components/dashboard/LocationBreakdown';
 export default function Dashboard() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
-  const [dateRange, setDateRange] = useState(30);
+  const [selectedDate, setSelectedDate] = useState('today');
   const queryClient = useQueryClient();
 
   // Check URL params for Square connection status
