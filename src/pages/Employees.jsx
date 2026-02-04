@@ -39,6 +39,14 @@ export default function Employees() {
     enabled: !!currentOrg?.id,
   });
 
+  const { data: transactions = [] } = useQuery({
+    queryKey: ['transactions', currentOrg?.id],
+    queryFn: () => base44.entities.Transaction.filter({
+      organization_id: currentOrg?.id
+    }),
+    enabled: !!currentOrg?.id,
+  });
+
   const { data: allocations = [] } = useQuery({
     queryKey: ['allocations', viewingHistory?.id],
     queryFn: () => base44.entities.TipAllocation.filter({ employee_id: viewingHistory?.id }),
@@ -159,6 +167,7 @@ export default function Employees() {
         ) : (
           <EmployeeTable 
             employees={filteredEmployees}
+            transactions={transactions}
             onEdit={handleEdit}
             onViewHistory={(emp) => setViewingHistory(emp)}
             onViewWallet={(emp) => setViewingWallet(emp)}

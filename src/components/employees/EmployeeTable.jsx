@@ -10,10 +10,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { formatMoney } from '@/components/common/formatMoney';
 
-export default function EmployeeTable({ employees = [], onEdit, onViewHistory, onViewWallet }) {
-  const formatCurrency = (value) => {
-    return `£${((value || 0) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
+export default function EmployeeTable({ employees = [], onEdit, onViewHistory, onViewWallet, transactions = [] }) {
+  
+  // Calculate per-employee totals from transactions
+  const getEmployeeStats = (employeeId) => {
+    const empTransactions = transactions.filter(tx => tx.employee_id === employeeId);
+    const totalEarned = empTransactions.reduce((sum, tx) => sum + (tx.tip_amount || 0), 0);
+    return { totalEarned };
   };
 
   const roleColors = {
@@ -53,7 +58,10 @@ export default function EmployeeTable({ employees = [], onEdit, onViewHistory, o
               </TableCell>
             </TableRow>
           ) : (
-            employees.map((employee) => (
+            employees.map((employee) => {
+              const stats = getEmployeeStats(employee.id);
+              
+              return (
               <TableRow key={employee.id} className="hover:bg-slate-50/50 transition-colors">
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -81,14 +89,14 @@ export default function EmployeeTable({ employees = [], onEdit, onViewHistory, o
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     <span className="font-semibold text-slate-900">
-                      {formatCurrency(employee.total_tips_earned)}
+                      {formatMoney(stats.totalEarned)}
                     </span>
                     <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="text-sm text-amber-600 font-medium">
-                    {formatCurrency(employee.pending_tips)}
+                    {formatMoney(employee.pending_tips || 0)}
                   </span>
                 </TableCell>
                 <TableCell>
@@ -124,7 +132,8 @@ export default function EmployeeTable({ employees = [], onEdit, onViewHistory, o
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))
+            );
+            })
           )}
         </TableBody>
       </Table>
