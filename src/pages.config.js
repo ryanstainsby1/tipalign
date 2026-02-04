@@ -78,6 +78,8 @@ import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
 import BonusRules from './pages/BonusRules';
+import EmployerDashboard from './pages/EmployerDashboard';
+import SquareSettings from './pages/SquareSettings';
 import __Layout from './Layout.jsx';
 
 
@@ -113,6 +115,8 @@ export const PAGES = {
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
     "BonusRules": BonusRules,
+    "EmployerDashboard": EmployerDashboard,
+    "SquareSettings": SquareSettings,
 }
 
 export const pagesConfig = {
