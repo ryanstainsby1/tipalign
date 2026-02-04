@@ -39,6 +39,19 @@ export default function EmployeePortal() {
     enabled: !!user,
   });
 
+  // Get bonus progress
+  const { data: bonusProgress = [] } = useQuery({
+    queryKey: ['bonusProgress', employees[0]?.id],
+    queryFn: async () => {
+      if (!employees[0]) return [];
+      const response = await base44.functions.invoke('getEmployeeDashboard', {
+        employee_id: employees[0].id
+      });
+      return response.data.success ? response.data.bonus_progress : [];
+    },
+    enabled: !!employees[0],
+  });
+
   // Try to find employee by email if not linked
   const { data: employeesByEmail = [] } = useQuery({
     queryKey: ['employeesByEmail', user?.email],
@@ -226,6 +239,48 @@ export default function EmployeePortal() {
             </Button>
           </div>
         </div>
+
+        {/* Bonus Progress */}
+        {bonusProgress.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Bonus Progress</h2>
+            <div className="grid gap-4">
+              {bonusProgress.map((bonus) => (
+                <Card key={bonus.rule_id} className="border-0 shadow-lg overflow-hidden">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">{bonus.rule_name}</h3>
+                        <p className="text-sm text-slate-500 capitalize">{bonus.period} bonus</p>
+                      </div>
+                      <Badge className={bonus.achieved ? 'bg-emerald-500' : 'bg-blue-500'}>
+                        {bonus.achieved ? '✓ Achieved' : 'In Progress'}
+                      </Badge>
+                    </div>
+                    <div className="mb-2">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-600">Progress</span>
+                        <span className="font-semibold text-slate-900">{bonus.progress_percent.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${bonus.achieved ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                          style={{ width: `${Math.min(bonus.progress_percent, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-sm text-slate-600 capitalize">
+                        {bonus.metric}: {bonus.current_value} / {bonus.threshold}
+                      </span>
+                      <span className="text-lg font-bold text-purple-600">{bonus.bonus_reward}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

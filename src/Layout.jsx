@@ -37,6 +37,7 @@ const navigationSections = [
       { name: 'Allocations', page: 'Allocations', icon: PieChart, color: 'text-orange-600' },
       { name: 'Locations', page: 'Locations', icon: MapPin, color: 'text-orange-600' },
       { name: 'Employees', page: 'Employees', icon: Users, color: 'text-emerald-600' },
+      { name: 'Bonus Rules', page: 'BonusRules', icon: Activity, color: 'text-purple-600' },
     ]
   },
   {
