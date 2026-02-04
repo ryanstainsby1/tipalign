@@ -49,6 +49,7 @@
  */
 import AllocationDetail from './pages/AllocationDetail';
 import Allocations from './pages/Allocations';
+import BonusRules from './pages/BonusRules';
 import ButtonWiringChecklist from './pages/ButtonWiringChecklist';
 import Compliance from './pages/Compliance';
 import ComplianceNotes from './pages/ComplianceNotes';
@@ -56,9 +57,11 @@ import ComplianceSettings from './pages/ComplianceSettings';
 import ConnectSquare from './pages/ConnectSquare';
 import Dashboard from './pages/Dashboard';
 import Disputes from './pages/Disputes';
+import EmployeeManagement from './pages/EmployeeManagement';
 import EmployeePortal from './pages/EmployeePortal';
 import EmployeeWalletInvite from './pages/EmployeeWalletInvite';
 import Employees from './pages/Employees';
+import EmployerDashboard from './pages/EmployerDashboard';
 import EmployerSignup from './pages/EmployerSignup';
 import Exports from './pages/Exports';
 import Ledger from './pages/Ledger';
@@ -74,19 +77,17 @@ import RulesBuilder from './pages/RulesBuilder';
 import Settings from './pages/Settings';
 import SmokeTest from './pages/SmokeTest';
 import SquareReviewPack from './pages/SquareReviewPack';
+import SquareSettings from './pages/SquareSettings';
 import SquareTroubleshoot from './pages/SquareTroubleshoot';
 import SystemStatus from './pages/SystemStatus';
 import Welcome from './pages/Welcome';
-import BonusRules from './pages/BonusRules';
-import EmployerDashboard from './pages/EmployerDashboard';
-import SquareSettings from './pages/SquareSettings';
-import EmployeeManagement from './pages/EmployeeManagement';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AllocationDetail": AllocationDetail,
     "Allocations": Allocations,
+    "BonusRules": BonusRules,
     "ButtonWiringChecklist": ButtonWiringChecklist,
     "Compliance": Compliance,
     "ComplianceNotes": ComplianceNotes,
@@ -94,9 +95,11 @@ export const PAGES = {
     "ConnectSquare": ConnectSquare,
     "Dashboard": Dashboard,
     "Disputes": Disputes,
+    "EmployeeManagement": EmployeeManagement,
     "EmployeePortal": EmployeePortal,
     "EmployeeWalletInvite": EmployeeWalletInvite,
     "Employees": Employees,
+    "EmployerDashboard": EmployerDashboard,
     "EmployerSignup": EmployerSignup,
     "Exports": Exports,
     "Ledger": Ledger,
@@ -112,13 +115,10 @@ export const PAGES = {
     "Settings": Settings,
     "SmokeTest": SmokeTest,
     "SquareReviewPack": SquareReviewPack,
+    "SquareSettings": SquareSettings,
     "SquareTroubleshoot": SquareTroubleshoot,
     "SystemStatus": SystemStatus,
     "Welcome": Welcome,
-    "BonusRules": BonusRules,
-    "EmployerDashboard": EmployerDashboard,
-    "SquareSettings": SquareSettings,
-    "EmployeeManagement": EmployeeManagement,
 }
 
 export const pagesConfig = {

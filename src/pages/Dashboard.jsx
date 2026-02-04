@@ -148,20 +148,39 @@ export default function Dashboard() {
     }
   });
 
+  // Date filtering
+  const [selectedDate, setSelectedDate] = useState('today');
+  
+  const getDateRange = () => {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    
+    if (selectedDate === 'today') {
+      return { start: startOfToday, end: now };
+    } else if (selectedDate === 'week') {
+      const startOfWeek = new Date(startOfToday);
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      return { start: startOfWeek, end: now };
+    } else if (selectedDate === 'month') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start: startOfMonth, end: now };
+    }
+    return { start: startOfToday, end: now };
+  };
+  
+  const dateRange = getDateRange();
+
   const { data: dailySummaries = [], isLoading: loadingSummaries } = useQuery({
-    queryKey: ['dailySummaries', organizationId, dateRange],
+    queryKey: ['dailySummaries', organizationId, selectedDate],
     queryFn: async () => {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - dateRange);
-      
       const summaries = await base44.entities.DailyRevenueSummary.filter({
         organization_id: organizationId
       });
       
       return summaries.filter(s => {
         const date = new Date(s.business_date);
-        return date >= startDate && date <= endDate;
+        return date >= dateRange.start && date <= dateRange.end;
       }).sort((a, b) => new Date(a.business_date) - new Date(b.business_date));
     },
     enabled: !!organizationId && !!squareConnection,
@@ -316,22 +335,16 @@ export default function Dashboard() {
   const totalTips = transactions.reduce((sum, tx) => sum + (tx.tip_amount || 0), 0);
   const pendingAllocations = allocations.filter(a => a.status === 'pending').length;
 
-  // Calculate metrics from DailyRevenueSummary
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  
-  const thisMonthSummaries = dailySummaries.filter(s => {
-    const date = new Date(s.business_date);
-    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-  });
+  // Calculate metrics from filtered date range
+  const filteredSummaries = dailySummaries;
 
-  const totalRevenue = thisMonthSummaries.reduce((sum, s) => sum + (s.total_gross_revenue_pence || 0), 0);
-  const totalTipsFromRevenue = thisMonthSummaries.reduce((sum, s) => sum + (s.total_tip_pence || 0), 0);
+  const totalRevenue = filteredSummaries.reduce((sum, s) => sum + (s.total_gross_revenue_pence || 0), 0);
+  const totalTipsFromRevenue = filteredSummaries.reduce((sum, s) => sum + (s.total_tip_pence || 0), 0);
   const avgTipRate = totalRevenue > 0 ? (totalTipsFromRevenue / totalRevenue) * 100 : 0;
 
-  // Location breakdown
+  // Location breakdown - filtered to selected date range
   const locationStats = locations.map(loc => {
-    const locSummaries = thisMonthSummaries.filter(s => s.location_id === loc.id);
+    const locSummaries = filteredSummaries.filter(s => s.location_id === loc.id);
     const revenue = locSummaries.reduce((sum, s) => sum + (s.total_gross_revenue_pence || 0), 0);
     const tips = locSummaries.reduce((sum, s) => sum + (s.total_tip_pence || 0), 0);
     const transactions = locSummaries.reduce((sum, s) => sum + (s.transaction_count || 0), 0);
@@ -346,7 +359,7 @@ export default function Dashboard() {
       tipRate,
       avgTipPerTransaction
     };
-  });
+  }).sort((a, b) => b.revenue - a.revenue);
   
   const last14Days = Array.from({ length: 14 }, (_, i) => {
     const date = subDays(new Date(), 13 - i);
@@ -664,18 +677,6 @@ export default function Dashboard() {
           <div className="mb-10">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-slate-900">Revenue Insights</h2>
-              <div className="flex gap-2">
-                {[7, 30, 90].map(days => (
-                  <Button
-                    key={days}
-                    variant={dateRange === days ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setDateRange(days)}
-                  >
-                    {days} days
-                  </Button>
-                ))}
-              </div>
             </div>
             {loadingSummaries ? (
               <Card className="border-0 shadow-lg">

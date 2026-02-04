@@ -120,52 +120,95 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Sync Payments (today)
+    // Sync Payments with pagination
     if (entity_types.includes('payments')) {
       try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        const daysBack = body.days_back || 7;
+        const beginDate = new Date();
+        beginDate.setDate(beginDate.getDate() - daysBack);
+        beginDate.setHours(0, 0, 0, 0);
+        const endDate = new Date();
 
-        const paymentsRes = await fetch(`${baseUrl}/payments?begin_time=${today.toISOString()}&end_time=${tomorrow.toISOString()}&limit=100`, {
-          headers
-        });
-        const paymentsData = await paymentsRes.json();
-        
-        for (const payment of paymentsData.payments || []) {
-          if (payment.status !== 'COMPLETED') continue;
+        let cursor = null;
+        let paymentsProcessed = 0;
+        let paymentsUpdated = 0;
 
-          const existing = await base44.asServiceRole.entities.Transaction.filter({
-            organization_id: orgId,
-            square_payment_id: payment.id
-          });
+        do {
+          const url = new URL(`${baseUrl}/payments`);
+          url.searchParams.set('begin_time', beginDate.toISOString());
+          url.searchParams.set('end_time', endDate.toISOString());
+          url.searchParams.set('limit', '100');
+          if (cursor) url.searchParams.set('cursor', cursor);
 
-          const amount = parseInt(payment.amount_money?.amount || 0);
-          const tipAmount = parseInt(payment.tip_money?.amount || 0);
-
-          const txData = {
-            organization_id: orgId,
-            square_payment_id: payment.id,
-            square_location_id: payment.location_id,
-            amount,
-            tip_amount: tipAmount,
-            total_amount: amount,
-            timestamp: payment.created_at,
-            transaction_date: payment.created_at,
-            currency: payment.amount_money?.currency || 'GBP',
-            order_id: payment.order_id,
-            sync_status: 'synced'
-          };
-
-          if (existing.length > 0) {
-            await base44.asServiceRole.entities.Transaction.update(existing[0].id, txData);
-          } else {
-            await base44.asServiceRole.entities.Transaction.create(txData);
+          const paymentsRes = await fetch(url.toString(), { headers });
+          if (!paymentsRes.ok) {
+            const errorText = await paymentsRes.text();
+            throw new Error(`Square API error: ${errorText}`);
           }
-          totalSynced++;
-        }
-        results.payments = paymentsData.payments?.length || 0;
+          
+          const paymentsData = await paymentsRes.json();
+          
+          for (const payment of paymentsData.payments || []) {
+            if (payment.status !== 'COMPLETED') continue;
+
+            // CRITICAL: Extract team_member_id from payment
+            const teamMemberId = payment.team_member_id;
+            
+            // Find employee by Square team member ID
+            let employeeId = null;
+            if (teamMemberId) {
+              const emps = await base44.asServiceRole.entities.Employee.filter({
+                organization_id: orgId,
+                square_team_member_id: teamMemberId
+              });
+              if (emps.length > 0) {
+                employeeId = emps[0].id;
+              }
+            }
+
+            const existing = await base44.asServiceRole.entities.Transaction.filter({
+              organization_id: orgId,
+              square_payment_id: payment.id
+            });
+
+            const amount = parseInt(payment.amount_money?.amount || 0);
+            const tipAmount = parseInt(payment.tip_money?.amount || 0);
+
+            const txData = {
+              organization_id: orgId,
+              square_payment_id: payment.id,
+              square_transaction_id: payment.id,
+              square_location_id: payment.location_id,
+              employee_id: employeeId,
+              amount,
+              tip_amount: tipAmount,
+              total_amount: amount,
+              timestamp: payment.created_at,
+              transaction_date: payment.created_at,
+              currency: payment.amount_money?.currency || 'GBP',
+              order_id: payment.order_id,
+              sync_status: 'synced'
+            };
+
+            if (existing.length > 0) {
+              await base44.asServiceRole.entities.Transaction.update(existing[0].id, txData);
+              paymentsUpdated++;
+            } else {
+              await base44.asServiceRole.entities.Transaction.create(txData);
+            }
+            paymentsProcessed++;
+          }
+          
+          cursor = paymentsData.cursor || null;
+          
+          // Rate limiting
+          if (cursor) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } while (cursor);
+
+        results.payments = paymentsProcessed;
+        results.payments_updated = paymentsUpdated;
       } catch (err) {
         console.error('Payment sync error:', err);
         results.payments_error = err.message;
