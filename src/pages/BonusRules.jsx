@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
+import { formatMoney } from '@/components/common/formatMoney';
 
 export default function BonusRules() {
   const [showDialog, setShowDialog] = useState(false);
@@ -107,12 +108,20 @@ export default function BonusRules() {
 
   const handleEdit = (rule) => {
     setEditingRule(rule);
+    // Convert pence to pounds for display
+    const displayThreshold = rule.metric === 'items' 
+      ? rule.threshold 
+      : rule.threshold / 100;
+    const displayBonusAmount = rule.bonus_type === 'percent'
+      ? rule.bonus_amount
+      : rule.bonus_amount / 100;
+    
     setFormData({
       name: rule.name,
       location_id: rule.location_id,
       metric: rule.metric,
-      threshold: rule.threshold,
-      bonus_amount: rule.bonus_amount,
+      threshold: displayThreshold,
+      bonus_amount: displayBonusAmount,
       bonus_type: rule.bonus_type,
       period: rule.period,
       is_active: rule.is_active
@@ -121,10 +130,19 @@ export default function BonusRules() {
   };
 
   const handleSubmit = () => {
+    // Convert pounds to pence for money metrics
+    const storeThreshold = formData.metric === 'items' 
+      ? parseInt(formData.threshold) 
+      : Math.round(parseFloat(formData.threshold) * 100);
+    
+    const storeBonusAmount = formData.bonus_type === 'percent'
+      ? parseInt(formData.bonus_amount)
+      : Math.round(parseFloat(formData.bonus_amount) * 100);
+
     const data = {
       ...formData,
-      threshold: parseInt(formData.threshold),
-      bonus_amount: parseInt(formData.bonus_amount)
+      threshold: storeThreshold,
+      bonus_amount: storeBonusAmount
     };
 
     if (editingRule) {
@@ -136,7 +154,7 @@ export default function BonusRules() {
 
   const formatValue = (value, metric) => {
     if (metric === 'sales' || metric === 'tips') {
-      return `£${(value / 100).toFixed(2)}`;
+      return formatMoney(value);
     }
     return value.toString();
   };
@@ -256,7 +274,7 @@ export default function BonusRules() {
                         <p className="text-sm text-slate-500 mb-1">Bonus Reward</p>
                         <p className="text-lg font-semibold text-purple-600">
                           {rule.bonus_type === 'flat'
-                            ? `£${(rule.bonus_amount / 100).toFixed(2)}`
+                            ? formatMoney(rule.bonus_amount)
                             : `${rule.bonus_amount}%`
                           }
                         </p>
@@ -343,12 +361,13 @@ export default function BonusRules() {
               </div>
 
               <div>
-                <Label>Threshold ({formData.metric === 'items' ? 'count' : 'pence'})</Label>
+                <Label>Threshold ({formData.metric === 'items' ? 'count' : '£'})</Label>
                 <Input
                   type="number"
+                  step={formData.metric === 'items' ? '1' : '0.01'}
                   value={formData.threshold}
                   onChange={(e) => setFormData({ ...formData, threshold: e.target.value })}
-                  placeholder={formData.metric === 'items' ? '50' : '50000'}
+                  placeholder={formData.metric === 'items' ? '50' : '500.00'}
                 />
               </div>
 
@@ -370,12 +389,13 @@ export default function BonusRules() {
                 </div>
 
                 <div>
-                  <Label>Bonus Amount ({formData.bonus_type === 'flat' ? 'pence' : '%'})</Label>
+                  <Label>Bonus Amount ({formData.bonus_type === 'flat' ? '£' : '%'})</Label>
                   <Input
                     type="number"
+                    step={formData.bonus_type === 'flat' ? '0.01' : '1'}
                     value={formData.bonus_amount}
                     onChange={(e) => setFormData({ ...formData, bonus_amount: e.target.value })}
-                    placeholder={formData.bonus_type === 'flat' ? '2000' : '10'}
+                    placeholder={formData.bonus_type === 'flat' ? '20.00' : '10'}
                   />
                 </div>
               </div>

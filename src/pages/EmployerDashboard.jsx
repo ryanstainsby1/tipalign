@@ -9,6 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { PoundSterling, Users, Trophy, RefreshCw, Zap, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { formatMoney } from '@/components/common/formatMoney';
 
 export default function EmployerDashboard() {
   const [viewMode, setViewMode] = useState('daily');
@@ -206,7 +207,7 @@ export default function EmployerDashboard() {
     }
   };
 
-  const formatMoney = (pence) => `£${(pence / 100).toFixed(2)}`;
+
 
   if (!organizationId) {
     return (

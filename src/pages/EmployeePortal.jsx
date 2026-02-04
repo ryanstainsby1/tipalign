@@ -21,6 +21,7 @@ import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import DisputeModal from '@/components/employee/DisputeModal';
 import TipTrendChart from '@/components/employee/TipTrendChart';
+import { formatMoney } from '@/components/common/formatMoney';
 
 export default function EmployeePortal() {
   const [showDisputeModal, setShowDisputeModal] = useState(false);
@@ -86,14 +87,30 @@ export default function EmployeePortal() {
     enabled: !!currentEmployee,
   });
 
+  // Real-time subscription for transactions
+  useEffect(() => {
+    if (!currentEmployee) return;
+
+    const unsubscribe = base44.entities.Transaction.subscribe((event) => {
+      if (event.type === 'create' && event.data.employee_id === currentEmployee.id) {
+        queryClient.invalidateQueries({ queryKey: ['my-allocations'] });
+        const amount = (event.data.amount || event.data.total_amount || 0);
+        toast.success(`New sale: ${formatMoney(amount)}`, {
+          duration: 4000,
+          className: 'bg-emerald-500 text-white'
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentEmployee, queryClient]);
+
   const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
     queryFn: () => base44.entities.Location.list(),
   });
 
-  const formatCurrency = (value) => {
-    return `£${((value || 0) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
-  };
+
 
   // Calculate stats
   const now = new Date();
@@ -287,21 +304,21 @@ export default function EmployeePortal() {
           <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
             <CardContent className="p-6">
               <p className="text-emerald-100 text-sm mb-2">Total Tips This Month</p>
-              <p className="text-3xl font-bold">{formatCurrency(currentMonthTips)}</p>
+              <p className="text-3xl font-bold">{formatMoney(currentMonthTips)}</p>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <p className="text-slate-500 text-sm mb-2">Tips Pending Payroll</p>
-              <p className="text-3xl font-bold text-blue-600">{formatCurrency(pendingTips)}</p>
+              <p className="text-3xl font-bold text-blue-600">{formatMoney(pendingTips)}</p>
             </CardContent>
           </Card>
 
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <p className="text-slate-500 text-sm mb-2">Average Tips Per Shift</p>
-              <p className="text-3xl font-bold text-slate-900">{formatCurrency(avgTipsPerShift)}</p>
+              <p className="text-3xl font-bold text-slate-900">{formatMoney(avgTipsPerShift)}</p>
             </CardContent>
           </Card>
 
@@ -346,7 +363,7 @@ export default function EmployeePortal() {
                         </TableCell>
                         <TableCell>{getLocationName(alloc.location_id)}</TableCell>
                         <TableCell className="text-right font-semibold">
-                          {formatCurrency(alloc.gross_amount)}
+                          {formatMoney(alloc.gross_amount)}
                         </TableCell>
                         <TableCell>
                           <Badge 
