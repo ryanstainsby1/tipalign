@@ -400,6 +400,32 @@ export default function Dashboard() {
               <p className="text-slate-600 text-lg">Real-time insights into allocations, compliance, and payroll</p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="flex gap-2 mr-4 bg-white rounded-lg p-1 shadow-sm border border-slate-200">
+                <Button
+                  variant={selectedDate === 'today' ? 'default' : 'ghost'}
+                  onClick={() => setSelectedDate('today')}
+                  size="sm"
+                  className={selectedDate === 'today' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                >
+                  Today
+                </Button>
+                <Button
+                  variant={selectedDate === 'week' ? 'default' : 'ghost'}
+                  onClick={() => setSelectedDate('week')}
+                  size="sm"
+                  className={selectedDate === 'week' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                >
+                  This Week
+                </Button>
+                <Button
+                  variant={selectedDate === 'month' ? 'default' : 'ghost'}
+                  onClick={() => setSelectedDate('month')}
+                  size="sm"
+                  className={selectedDate === 'month' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                >
+                  This Month
+                </Button>
+              </div>
               {squareConnection && (
                 <>
                   <Button
@@ -411,16 +437,6 @@ export default function Dashboard() {
                   >
                     <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
                     {syncMutation.isPending ? 'Syncing...' : 'Sync Data'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => salesSyncMutation.mutate()}
-                    disabled={syncMutation.isPending || salesSyncMutation.isPending}
-                    className="border-indigo-300 hover:border-indigo-400 shadow-sm"
-                    size="lg"
-                  >
-                    <PoundSterling className={`w-4 h-4 mr-2 ${salesSyncMutation.isPending ? 'animate-spin' : ''}`} />
-                    {salesSyncMutation.isPending ? 'Syncing Sales...' : 'Sync Sales'}
                   </Button>
                 </>
               )}
