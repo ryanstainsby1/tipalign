@@ -148,9 +148,7 @@ export default function Dashboard() {
     }
   });
 
-  // Date filtering
-  const [selectedDate, setSelectedDate] = useState('today');
-  
+  // Date filtering logic
   const getDateRange = () => {
     const now = new Date();
     const startOfToday = new Date(now);
