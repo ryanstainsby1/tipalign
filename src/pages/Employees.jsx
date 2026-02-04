@@ -11,6 +11,7 @@ import EmployeeTable from '@/components/employees/EmployeeTable';
 import EmployeeTipHistory from '@/components/employee/EmployeeTipHistory';
 import WalletPassSection from '@/components/employees/WalletPassSection';
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMoney } from '@/components/common/formatMoney';
 
 export default function Employees() {
   const [searchQuery, setSearchQuery] = useState('');

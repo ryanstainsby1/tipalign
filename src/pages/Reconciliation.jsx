@@ -23,14 +23,28 @@ import { format } from 'date-fns';
 export default function Reconciliation() {
   const [activeTab, setActiveTab] = useState('unallocated');
 
-  const { data: payments = [], isLoading: loadingPayments } = useQuery({
-    queryKey: ['payments'],
-    queryFn: () => base44.entities.Payment.list('-payment_date', 200),
+  const { data: currentOrg } = useQuery({
+    queryKey: ['currentOrganization'],
+    queryFn: async () => {
+      const response = await base44.functions.invoke('getCurrentOrganization', {});
+      return response.data.success ? response.data.organization : null;
+    },
+  });
+
+  const { data: transactions = [], isLoading: loadingPayments } = useQuery({
+    queryKey: ['transactions', currentOrg?.id],
+    queryFn: () => base44.entities.Transaction.filter({ 
+      organization_id: currentOrg?.id 
+    }),
+    enabled: !!currentOrg?.id,
   });
 
   const { data: allocations = [] } = useQuery({
-    queryKey: ['allocations'],
-    queryFn: () => base44.entities.TipAllocationLine.list('-allocation_date', 500),
+    queryKey: ['allocations', currentOrg?.id],
+    queryFn: () => base44.entities.TipAllocation.filter({ 
+      organization_id: currentOrg?.id 
+    }),
+    enabled: !!currentOrg?.id,
   });
 
   const { data: employees = [] } = useQuery({
@@ -52,25 +66,30 @@ export default function Reconciliation() {
     return `£${((value || 0) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
   };
 
-  // Analysis: Payments with tips but no allocation
-  const paymentsWithTips = payments.filter(p => p.tip_amount > 0);
-  const allocatedPaymentIds = new Set(allocations.map(a => a.payment_id));
-  const unallocatedPayments = paymentsWithTips.filter(p => !allocatedPaymentIds.has(p.id));
-  const totalUnallocatedTips = unallocatedPayments.reduce((sum, p) => sum + p.tip_amount, 0);
+  // Analysis: Transactions with tips but no allocation
+  const transactionsWithTips = transactions.filter(tx => (tx.tip_amount || 0) > 0);
+  
+  // Build set of allocated transaction IDs from TipAllocation records
+  const allocatedTransactionIds = new Set();
+  allocations.forEach(alloc => {
+    if (alloc.transaction_id) {
+      allocatedTransactionIds.add(alloc.transaction_id);
+    }
+  });
+  
+  const unallocatedPayments = transactionsWithTips.filter(tx => !allocatedTransactionIds.has(tx.id));
+  const totalUnallocatedTips = unallocatedPayments.reduce((sum, tx) => sum + (tx.tip_amount || 0), 0);
 
-  // Analysis: Payments without tips
-  const paymentsWithoutTips = payments.filter(p => !p.tip_amount || p.tip_amount === 0);
-
-  // Analysis: Payments without employee assignment
-  const paymentsWithoutEmployee = payments.filter(p => !p.employee_id && p.tip_amount > 0);
+  // Analysis: Transactions without employee assignment
+  const paymentsWithoutEmployee = transactions.filter(tx => !tx.employee_id && (tx.tip_amount || 0) > 0);
 
   // Analysis: Shifts without any payments
-  const shiftsWithPayments = new Set(payments.filter(p => p.shift_id).map(p => p.shift_id));
+  const shiftsWithPayments = new Set(transactions.filter(tx => tx.shift_id).map(tx => tx.shift_id));
   const shiftsWithoutPayments = shifts.filter(s => s.status === 'closed' && !shiftsWithPayments.has(s.id));
 
-  // Analysis: Refunded payments impacting allocations
-  const refundedPayments = payments.filter(p => p.status === 'refunded');
-  const refundedWithAllocations = refundedPayments.filter(p => allocatedPaymentIds.has(p.id));
+  // Analysis: Refunded transactions impacting allocations
+  const refundedPayments = transactions.filter(tx => tx.allocation_status === 'refunded' || tx.status === 'refunded');
+  const refundedWithAllocations = refundedPayments.filter(tx => allocatedTransactionIds.has(tx.id));
 
   // Analysis: Inactive employees with pending tips
   const inactiveEmployeesWithTips = employees.filter(e => 
@@ -194,26 +213,26 @@ export default function Reconciliation() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {unallocatedPayments.slice(0, 50).map(payment => (
-                        <TableRow key={payment.id}>
-                          <TableCell>
-                            {format(new Date(payment.payment_date), 'dd MMM yyyy HH:mm')}
-                          </TableCell>
-                          <TableCell>{payment.location_name || '-'}</TableCell>
-                          <TableCell>
-                            {payment.employee_id ? (
-                              employees.find(e => e.id === payment.employee_id)?.full_name || 'Unknown'
-                            ) : (
-                              <Badge variant="outline" className="bg-amber-50 text-amber-700">No employee</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-amber-600">
-                            {formatCurrency(payment.tip_amount)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(payment.total_amount)}
-                          </TableCell>
-                        </TableRow>
+                      {unallocatedPayments.slice(0, 50).map(tx => (
+                       <TableRow key={tx.id}>
+                         <TableCell>
+                           {format(new Date(tx.transaction_date || tx.timestamp), 'dd MMM yyyy HH:mm')}
+                         </TableCell>
+                         <TableCell>{tx.location_name || '-'}</TableCell>
+                         <TableCell>
+                           {tx.employee_id ? (
+                             employees.find(e => e.id === tx.employee_id)?.full_name || 'Unknown'
+                           ) : (
+                             <Badge variant="outline" className="bg-amber-50 text-amber-700">No employee</Badge>
+                           )}
+                         </TableCell>
+                         <TableCell className="text-right font-semibold text-amber-600">
+                           {formatCurrency(tx.tip_amount || 0)}
+                         </TableCell>
+                         <TableCell className="text-right">
+                           {formatCurrency(tx.total_amount || tx.amount || 0)}
+                         </TableCell>
+                       </TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -247,12 +266,12 @@ export default function Reconciliation() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {paymentsWithoutEmployee.slice(0, 20).map(payment => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{format(new Date(payment.payment_date), 'dd MMM yyyy HH:mm')}</TableCell>
-                            <TableCell>{payment.location_name}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(payment.tip_amount)}</TableCell>
-                            <TableCell><code className="text-xs">{payment.square_payment_id}</code></TableCell>
+                        {paymentsWithoutEmployee.slice(0, 20).map(tx => (
+                          <TableRow key={tx.id}>
+                            <TableCell>{format(new Date(tx.transaction_date || tx.timestamp), 'dd MMM yyyy HH:mm')}</TableCell>
+                            <TableCell>{tx.location_name || '-'}</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(tx.tip_amount || 0)}</TableCell>
+                            <TableCell><code className="text-xs">{tx.square_payment_id}</code></TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -341,15 +360,15 @@ export default function Reconciliation() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {refundedWithAllocations.map(payment => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{format(new Date(payment.payment_date), 'dd MMM yyyy')}</TableCell>
+                        {refundedWithAllocations.map(tx => (
+                          <TableRow key={tx.id}>
+                            <TableCell>{format(new Date(tx.transaction_date || tx.timestamp), 'dd MMM yyyy')}</TableCell>
                             <TableCell>
-                              {payment.refunded_at ? format(new Date(payment.refunded_at), 'dd MMM yyyy') : '-'}
+                              {tx.refunded_at ? format(new Date(tx.refunded_at), 'dd MMM yyyy') : '-'}
                             </TableCell>
-                            <TableCell>{payment.location_name}</TableCell>
+                            <TableCell>{tx.location_name || '-'}</TableCell>
                             <TableCell className="text-right font-semibold text-red-600">
-                              -{formatCurrency(payment.tip_amount)}
+                              -{formatCurrency(tx.tip_amount || 0)}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="bg-red-50 text-red-700">Refunded</Badge>
