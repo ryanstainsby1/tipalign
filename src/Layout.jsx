@@ -15,7 +15,8 @@ import {
   ChevronRight,
   User,
   RefreshCw,
-  Activity
+  Activity,
+  Wallet
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -49,8 +50,9 @@ const navigationSections = [
     ]
   },
   {
-    label: 'SUPPORT',
+    label: 'CONFIGURATION',
     items: [
+      { name: 'Square Settings', page: 'SquareSettings', icon: Settings, color: 'text-slate-500' },
       { name: 'Settings', page: 'Settings', icon: Settings, color: 'text-slate-500' },
     ]
   }

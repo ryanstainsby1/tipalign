@@ -80,6 +80,7 @@ import Welcome from './pages/Welcome';
 import BonusRules from './pages/BonusRules';
 import EmployerDashboard from './pages/EmployerDashboard';
 import SquareSettings from './pages/SquareSettings';
+import EmployeeManagement from './pages/EmployeeManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -117,6 +118,7 @@ export const PAGES = {
     "BonusRules": BonusRules,
     "EmployerDashboard": EmployerDashboard,
     "SquareSettings": SquareSettings,
+    "EmployeeManagement": EmployeeManagement,
 }
 
 export const pagesConfig = {
